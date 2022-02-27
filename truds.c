@@ -8,6 +8,8 @@
 #include <stdbool.h>
 #include <stdarg.h>
 #include <fcntl.h>
+#include <time.h>
+
 
 #include <net/if.h>
 #include <sys/ioctl.h>
@@ -49,6 +51,23 @@ pthread_t rx_can_thread __attribute__ ((visibility ("hidden") ));
 
 #warning Need to send periodic tester-present messages when in session?
 
+// Returns milliseconds past the epoch
+uint64_t timestamp(void) {
+    struct timespec spec;
+
+    clock_gettime(CLOCK_REALTIME, &spec);
+
+    return ( spec.tv_sec + (spec.tv_nsec / 1.0e9) ) * 1000ull;
+}
+
+void replace(char *s, const char find, const char replace, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        if (s[i] == find) {
+            s[i] = replace;
+        }
+    }
+}
+
 void print_can_frame(struct can_frame *frame) {
     printf("0x%03X [%d] ", frame->can_id, frame->can_dlc);
 
@@ -73,161 +92,165 @@ static void *rx_can(void *p) {
         nbytes = read(cansocket, &frame, sizeof(struct can_frame));
 
         if( (nbytes > 0) &&
-            ( (frame.can_id & 0x700) == 0x700) ) { // Workaround for filter letting initial unmatching frame though
+                ( (frame.can_id & 0x700) == 0x700) ) { // Workaround for filter letting initial unmatching frame though
 
             // DEBUG //
             //print_can_frame(&frame);
             // DEBUG //
 
-            if ((frame.can_id - 8) != uds_response.can_id) { return NULL; }
+            if ((frame.can_id - 8) != uds_response.can_id) {
+                return NULL;
+            }
 
             switch ( HNYBBLE8(frame.data[0]) ) {
-                case 0: // Single frame contains complete response
-                case 1: // First frame of multi-frame response
+            case 0: // Single frame contains complete response
+            case 1: // First frame of multi-frame response
 
-                    // Common to case 0 and 1
-                    uds_response.data_size = 0;
+                // Common to case 0 and 1
+                uds_response.data_size = 0;
 
-                    // Single frame contains complete response
-                    if ( HNYBBLE8(frame.data[0]) == 0 ) {
+                // Single frame contains complete response
+                if ( HNYBBLE8(frame.data[0]) == 0 ) {
 
-                        // DEBUG //
-                        //printf("ISO-TP-0 Single frame response\n"); fflush(NULL);
-                        // DEBUG //
+                    // DEBUG //
+                    //printf("ISO-TP-0 Single frame response\n"); fflush(NULL);
+                    // DEBUG //
 
-                        if (frame.data[1] == SID_NEG_RESP) {
+                    if (frame.data[1] == SID_NEG_RESP) {
 #warning "Add detailed error handling"
-                            // TODO: Process the rest of this code to determine more detailed information about the error.
-                                     // See softing poster?
+                        // TODO: Process the rest of this code to determine more detailed information about the error.
+                        // See softing poster?
 
-                            printf("ERROR: Request could not be satisfied\n"); fflush(NULL);
-                            return NULL;
-                        }
-
-                        // Convert response SID into original request SID
-                        uds_response.sid = frame.data[1] & 0b10111111;
-
-                        // SID dictates interpretation of response?
-                        switch(uds_response.sid) {
-
-                            case SID_DIAG_SESS_CTRL:
-                            case SID_SEC_ACCESS:
-                            case SID_TESTER_PRESENT:
-                                frame_data_offset = 3;
-                                uds_response.pid = frame.data[1];
-                            break;
-
-                            case SID_IO_CTRL_ID:
-                            case SID_RD_DATA_ID:
-                                frame_data_offset = 4;
-                                uds_response.pid = UINT16(frame.data[2], frame.data[3]);
-                            break;
-
-                            default:
-                                printf("[0] Unhandled SID: 0x%02X\n", uds_response.sid);
-                                return NULL;
-                        }
-
-                        uds_response.data_size = LNYBBLE8(frame.data[0]) - frame_data_offset + 1;
-                        memcpy(uds_response.data, frame.data + frame_data_offset, uds_response.data_size);
-                        uds_response.data_received = uds_response.data_size;
+                        printf("ERROR: Request could not be satisfied\n");
+                        fflush(NULL);
+                        return NULL;
                     }
 
-                    // First frame of multi-frame response
-                    else {
+                    // Convert response SID into original request SID
+                    uds_response.sid = frame.data[1] & 0b10111111;
 
-                        // DEBUG //
-                        //printf("ISO-TP-1 First frame of multi-frame response\n"); fflush(NULL);
-                        // DEBUG //
+                    // SID dictates interpretation of response?
+                    switch(uds_response.sid) {
 
-                        // Convert response SID into request SID
-                        uds_response.sid = frame.data[2] & 0b10111111;
-
-                        // SID dictates interpretation of response?
-                        switch(uds_response.sid) {
-
-                            case SID_RQ_VEH_INFO:
-                                frame_data_offset = 5;
-                                uds_response.pid = frame.data[3];
-                                uds_response.data_size = UINT16(LNYBBLE8(frame.data[0]), frame.data[1]) - frame_data_offset + 2;
-                            break;
-
-                            case SID_RD_DATA_ID:
-                                frame_data_offset = 5;
-                                uds_response.pid = UINT16(frame.data[3], frame.data[4]);
-                                uds_response.data_size = UINT16(LNYBBLE8(frame.data[0]), frame.data[1]) - frame_data_offset + 1;
-                            break;
-
-                            default:
-                                printf("[1] Unhandled SID: 0x%02X\n", uds_response.sid);
-                                return NULL;
-                        }
-
-                        memcpy(uds_response.data, frame.data + frame_data_offset, 8 - frame_data_offset);
-                        uds_response.data_received = 8 - frame_data_offset;
-                    }
-
-                    // Common to case 0 and 1
-                    uds_response.frame_index = 0; // May not be required if this is correctly initialized
-
-                    // First frame of multi-frame response
-                    if ( HNYBBLE8(frame.data[0]) == 1 ) {
-                        // Send flow control response directing ECU to send all remaining frames without delay
-
-                        // TODO: Replace with call to request_uds(), re-entrant??
-                        // TODO: Either reset the timeout on receipt of each consecutive frame, or require that the timeout be set longer for multi-frame responses that take some time, if it's even a problem with the default timeout for single frame responses
-                        struct can_frame frame;
-                        frame.can_id = uds_response.can_id - 8;
-                        frame.can_dlc = 8;
-                        frame.data[0] = 0x30;
-                        memset(frame.data+1, 0, 7);
-                        write(cansocket, &frame, sizeof(struct can_frame));
-                    }
-
-                    //return NULL;
-
-                break;
-
-                case 2: // Consecutive frame of multi-frame response
-
-                    // DEBUG //
-                    //printf("ISO-TP-2 consecutive frame\n"); fflush(NULL);
-                    // DEBUG //
-
-                    if ( (uds_response.can_id == frame.can_id) &&
-                         (uds_response.frame_index == prev_frame_index ) &&
-                         (uds_response.data_received < uds_response.data_size) )
-                    {
-
-                        // DEBUG //
-                        //printf("ISO-TP-2: Matched consecutive frame with previous\n");
-                        // DEBUG //
-
-                        data_bytes_left = uds_response.data_size - uds_response.data_received;
-
-                        if( data_bytes_left >= 7 ) {
-                            memcpy(uds_response.data + uds_response.data_received, frame.data + 1, 7);
-                            uds_response.data_received += 7;
-                        }
-                        else {
-                            memcpy(uds_response.data + uds_response.data_received, frame.data + 1, data_bytes_left);
-                            uds_response.data_received += data_bytes_left;
-                        }
-
-                        uds_response.frame_index = LNYBBLE8(frame.data[0]);
-
+                    case SID_DIAG_SESS_CTRL:
+                    case SID_SEC_ACCESS:
+                    case SID_TESTER_PRESENT:
+                        frame_data_offset = 3;
+                        uds_response.pid = frame.data[1];
                         break;
+
+                    case SID_IO_CTRL_ID:
+                    case SID_RD_DATA_ID:
+                        frame_data_offset = 4;
+                        uds_response.pid = UINT16(frame.data[2], frame.data[3]);
+                        break;
+
+                    default:
+                        printf("[0] Unhandled SID: 0x%02X\n", uds_response.sid);
+                        return NULL;
                     }
 
+                    uds_response.data_size = LNYBBLE8(frame.data[0]) - frame_data_offset + 1;
+                    memcpy(uds_response.data, frame.data + frame_data_offset, uds_response.data_size);
+                    uds_response.data_received = uds_response.data_size;
+                }
+
+                // First frame of multi-frame response
+                else {
+
+                    // DEBUG //
+                    //printf("ISO-TP-1 First frame of multi-frame response\n"); fflush(NULL);
+                    // DEBUG //
+
+                    // Convert response SID into request SID
+                    uds_response.sid = frame.data[2] & 0b10111111;
+
+                    // SID dictates interpretation of response?
+                    switch(uds_response.sid) {
+
+                    case SID_RQ_VEH_INFO:
+                        frame_data_offset = 5;
+                        uds_response.pid = frame.data[3];
+                        uds_response.data_size = UINT16(LNYBBLE8(frame.data[0]), frame.data[1]) - frame_data_offset + 2;
+                        break;
+
+                    case SID_RD_DATA_ID:
+                        frame_data_offset = 5;
+                        uds_response.pid = UINT16(frame.data[3], frame.data[4]);
+                        uds_response.data_size = UINT16(LNYBBLE8(frame.data[0]), frame.data[1]) - frame_data_offset + 1;
+                        break;
+
+                    default:
+                        printf("[1] Unhandled SID: 0x%02X\n", uds_response.sid);
+                        return NULL;
+                    }
+
+                    memcpy(uds_response.data, frame.data + frame_data_offset, 8 - frame_data_offset);
+                    uds_response.data_received = 8 - frame_data_offset;
+                }
+
+                // Common to case 0 and 1
+                uds_response.frame_index = 0; // May not be required if this is correctly initialized
+
+                // First frame of multi-frame response
+                if ( HNYBBLE8(frame.data[0]) == 1 ) {
+                    // Send flow control response directing ECU to send all remaining frames without delay
+
+                    // TODO: Replace with call to request_uds(), re-entrant??
+                    // TODO: Either reset the timeout on receipt of each consecutive frame, or require that the timeout be set longer for multi-frame responses that take some time, if it's even a problem with the default timeout for single frame responses
+                    struct can_frame frame;
+                    frame.can_id = uds_response.can_id - 8;
+                    frame.can_dlc = 8;
+                    frame.data[0] = 0x30;
+                    memset(frame.data+1, 0, 7);
+                    write(cansocket, &frame, sizeof(struct can_frame));
+                }
+
+                //return NULL;
+
                 break;
 
-                case 3: // Flow control frame
+            case 2: // Consecutive frame of multi-frame response
+
+                // DEBUG //
+                //printf("ISO-TP-2 consecutive frame\n"); fflush(NULL);
+                // DEBUG //
+
+                if ( (uds_response.can_id == frame.can_id) &&
+                        (uds_response.frame_index == prev_frame_index ) &&
+                        (uds_response.data_received < uds_response.data_size) )
+                {
+
+                    // DEBUG //
+                    //printf("ISO-TP-2: Matched consecutive frame with previous\n");
+                    // DEBUG //
+
+                    data_bytes_left = uds_response.data_size - uds_response.data_received;
+
+                    if( data_bytes_left >= 7 ) {
+                        memcpy(uds_response.data + uds_response.data_received, frame.data + 1, 7);
+                        uds_response.data_received += 7;
+                    }
+                    else {
+                        memcpy(uds_response.data + uds_response.data_received, frame.data + 1, data_bytes_left);
+                        uds_response.data_received += data_bytes_left;
+                    }
+
+                    uds_response.frame_index = LNYBBLE8(frame.data[0]);
+
+                    break;
+                }
+
+                break;
+
+            case 3: // Flow control frame
 
 
 
                 break;
 
-                default: return NULL; // Other codes are reserved and we'll ignore them
+            default:
+                return NULL; // Other codes are reserved and we'll ignore them
             }
 
 
@@ -262,7 +285,7 @@ bool begin_session_uds(canid_t can_id, uint8_t type) {
     response_size = request_uds((uint8_t *)&response, sizeof(response), can_id, SID_DIAG_SESS_CTRL, 1, UDS_DIAG_EXTENDED);
 
     if ((response_size == 4) &&
-        (response.byte[0] != SID_NEG_RESP)) {
+            (response.byte[0] != SID_NEG_RESP)) {
 
 #warning CODE STUB - create node in session tracking list
 
@@ -282,7 +305,7 @@ bool end_session_uds(canid_t can_id) {
     response_size = request_uds((uint8_t *)&response, sizeof(response), can_id, SID_DIAG_SESS_CTRL, 1, UDS_DIAG_DEFAULT);
 
     if ((response_size == 4) &&
-        (response.byte[0] != SID_NEG_RESP)) {
+            (response.byte[0] != SID_NEG_RESP)) {
 
 #warning CODE STUB - remove node in session tracking list
 
@@ -337,7 +360,9 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
     // Copy up to 8 var_args into temp array
     va_start(args, n);
     for (int i = 0; i <= n; i++) {
-        if (i > 7) { break; }
+        if (i > 7) {
+            break;
+        }
 
         vardata[i] = va_arg(args, int);
     }
@@ -350,57 +375,57 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
     // Data format to send and whether a reply is expected is dependent on sid and possibly some data bytes
     switch(sid) {
 
-        case SID_SEC_ACCESS:
-            pid = vardata[0];
-            frame.data[0] = 2;
-            frame.data[1] = sid;
-            frame.data[2] = pid;
+    case SID_SEC_ACCESS:
+        pid = vardata[0];
+        frame.data[0] = 2;
+        frame.data[1] = sid;
+        frame.data[2] = pid;
 
-            if(pid == 4) {
-                frame.data[0] += 3;
+        if(pid == 4) {
+            frame.data[0] += 3;
 
-                frame.data[3] = vardata[1];
-                frame.data[4] = vardata[2];
-                frame.data[5] = vardata[3];
-            }
+            frame.data[3] = vardata[1];
+            frame.data[4] = vardata[2];
+            frame.data[5] = vardata[3];
+        }
 
-            break;
-
-#warning "TODO Number of bytes likely varies depending on PID"
-        // TODO: Maybe some range checking here too...
-        case SID_IO_CTRL_ID:
-            pid = vardata[0];
-            frame.data[0] = 6;
-            frame.data[1] = sid;
-            frame.data[2] = HBYTE16(pid);
-            frame.data[3] = LBYTE16(pid);
-            frame.data[4] = vardata[1];
-            frame.data[5] = vardata[2];
-            frame.data[6] = vardata[3];
         break;
 
-        case SID_TESTER_PRESENT:
-        case SID_RQ_VEH_INFO:
-        case SID_DIAG_SESS_CTRL:
-            pid = vardata[0];
-            frame.data[0] = 2;
-            frame.data[1] = sid;
-            frame.data[2] = pid;
-            break;
+#warning "TODO Number of bytes likely varies depending on PID"
+    // TODO: Maybe some range checking here too...
+    case SID_IO_CTRL_ID:
+        pid = vardata[0];
+        frame.data[0] = 6;
+        frame.data[1] = sid;
+        frame.data[2] = HBYTE16(pid);
+        frame.data[3] = LBYTE16(pid);
+        frame.data[4] = vardata[1];
+        frame.data[5] = vardata[2];
+        frame.data[6] = vardata[3];
+        break;
 
-        case SID_RD_DATA_ID:
-            pid = vardata[0];
-            frame.data[0] = 3;
-            frame.data[1] = sid;
-            frame.data[2] = HBYTE16(pid);
-            frame.data[3] = LBYTE16(pid);
-            break;
+    case SID_TESTER_PRESENT:
+    case SID_RQ_VEH_INFO:
+    case SID_DIAG_SESS_CTRL:
+        pid = vardata[0];
+        frame.data[0] = 2;
+        frame.data[1] = sid;
+        frame.data[2] = pid;
+        break;
 
-        default:
-            // DEBUG //
-            printf("ERROR: Unhandled SID\n");
-            // DEBUG //
-            return ERR_REQ_UDS_UNH_SID;
+    case SID_RD_DATA_ID:
+        pid = vardata[0];
+        frame.data[0] = 3;
+        frame.data[1] = sid;
+        frame.data[2] = HBYTE16(pid);
+        frame.data[3] = LBYTE16(pid);
+        break;
+
+    default:
+        // DEBUG //
+        printf("ERROR: Unhandled SID\n");
+        // DEBUG //
+        return ERR_REQ_UDS_UNH_SID;
     }
 
     init_response_uds(can_id, sid, pid);
@@ -417,8 +442,8 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
     }
 
     while( (running) &&
-           (uds_busy) &&
-           (!timeout) ) {
+            (uds_busy) &&
+            (!timeout) ) {
         usleep(1000);
         timeout = (timestamp() - request_start_ms) > request_timeout_ms;
     }
@@ -431,7 +456,7 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
     }
 
     if ( (running) &&
-         (buff != NULL) ) {
+            (buff != NULL) ) {
         response_size = min(buff_max, uds_response.data_size);
         memcpy(buff, uds_response.data, response_size);
         return response_size;
@@ -598,10 +623,10 @@ void parse_pid_data(uint16_t pid, uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7
 void init_can(char *can_interface) {
     struct can_filter filter[1];
 
-	if ( (cansocket = begin_can(can_interface)) == -1 ) {
-		printf("Could not start CAN interface '%s'\n", can_interface);
-		exit(1);
-	}
+    if ( (cansocket = begin_can(can_interface)) == -1 ) {
+        printf("Could not start CAN interface '%s'\n", can_interface);
+        exit(1);
+    }
 
     filter[0].can_id = 0x700;
     filter[0].can_mask = 0x700;
@@ -815,7 +840,7 @@ bool request_security(canid_t can_id) {
     result = request_uds((uint8_t *)&response, sizeof(response), can_id, SID_SEC_ACCESS, 1, 3);
 
     if ((result == 3) &&
-        (response.byte[0] != SID_NEG_RESP)) {
+            (response.byte[0] != SID_NEG_RESP)) {
 
         seed.byte[3] = 0;
         seed.byte[2] = response.byte[0];
@@ -833,7 +858,7 @@ bool request_security(canid_t can_id) {
         // DEBUG //
 
         result = request_uds((uint8_t *)&response, sizeof(response), can_id, SID_SEC_ACCESS, 4,
-                                    4, key.byte[2], key.byte[1], key.byte[0]);
+                             4, key.byte[2], key.byte[1], key.byte[0]);
 
 #warning TODO Check what negative security access response looks like
         if (result == 0) {

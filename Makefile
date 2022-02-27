@@ -1,6 +1,6 @@
 CC = gcc
-CFLAGS = -Wfatal-errors -Wall -fvisibility=hidden
-LDFLAGS = -lpthread
+CFLAGS = -Wall -fvisibility=hidden
+LDFLAGS = -lpthread -L./ -ltruds
 OUTPUT_FILE = libtruds.a
 INSTALL_DIR = /usr/local/lib/truds
 CLEAN_EXT = o a d
@@ -11,14 +11,14 @@ SOURCES = truds.c
 all: $(OUTPUT_FILE)
 
 test: test.c $(OUTPUT_FILE)
-	$(CC) test.c -o $@ -L./ -ltruds
+	$(CC) test.c -o $@ $(LDFLAGS)
 
 $(OUTPUT_FILE): $(SOURCES:.c=.o)
 	ar r $@ $^
 	ranlib $@
 
 $(SOURCES:.c=.o): $(SOURCES)
-	$(CC) $(CFLAGS) -o $@ -c $< $(LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ -c $<
 
 .PHONY: install
 install:

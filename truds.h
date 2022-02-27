@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+extern bool request_security(canid_t can_id);
+extern void init_can(char *can_interface);
 extern int begin_can(char *can_iface_name);
 extern void end_can(void);
 extern int send_tester_present_uds(canid_t can_id);
