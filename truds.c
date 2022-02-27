@@ -21,6 +21,11 @@
 #include "uds.h"
 #include "truds.h"
 
+// TODO: Major cleanup after restructuring, remove unused
+// TODO: Refactor as object to handle connection to multiple CAN busses
+
+//------------- OLD COMMENTS BELOW HERE -----------------------
+
 // TODO: *** Modify add_pid_request (change name) to take different formats of requests: security, tester present, session, pid, etc. ***
 
 // TODO: Add PIDS (0x22) and (0x09) from config file
@@ -98,7 +103,16 @@ static void *rx_can(void *p) {
             //print_can_frame(&frame);
             // DEBUG //
 
-            if ((frame.can_id - 8) != uds_response.can_id) {
+            // If request was OBD2 broadcast address (0x7DF) then valid response is in the range 0x7E8-0x7EF
+            if (uds_response.can_id == 0x7DF) {
+                if ( (frame.can_id < 0x7E8) || (frame.can_id > 0x7EF) ) {
+                    printf("ERROR: Response to broadcast request out of range\n");
+                    return NULL;
+                }
+            }
+            // Response address = request address + 8
+            else if ((frame.can_id - 8) != uds_response.can_id) { 
+                printf("ERROR: Response address did not match request address\n");
                 return NULL;
             }
 
@@ -137,6 +151,12 @@ static void *rx_can(void *p) {
                     case SID_TESTER_PRESENT:
                         frame_data_offset = 3;
                         uds_response.pid = frame.data[1];
+                        break;
+
+#warning "Different pids return different number bytes result"
+                    case SID_SHOW_CURR_DATA:
+                        frame_data_offset = 3;
+                        uds_response.pid = frame.data[3];
                         break;
 
                     case SID_IO_CTRL_ID:
@@ -407,6 +427,7 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
     case SID_TESTER_PRESENT:
     case SID_RQ_VEH_INFO:
     case SID_DIAG_SESS_CTRL:
+    case SID_SHOW_CURR_DATA:
         pid = vardata[0];
         frame.data[0] = 2;
         frame.data[1] = sid;
@@ -423,7 +444,7 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
 
     default:
         // DEBUG //
-        printf("ERROR: Unhandled SID\n");
+        printf("ERROR: [2] Unhandled SID\n");
         // DEBUG //
         return ERR_REQ_UDS_UNH_SID;
     }
@@ -441,6 +462,7 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
         return ERR_REQ_UDS_CAN_WR;
     }
 
+    // Non-blocking wait for rx_can thread to receive response, or timeout
     while( (running) &&
             (uds_busy) &&
             (!timeout) ) {
@@ -458,6 +480,7 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
     if ( (running) &&
             (buff != NULL) ) {
         response_size = min(buff_max, uds_response.data_size);
+        memset(buff, 0, buff_max);
         memcpy(buff, uds_response.data, response_size);
         return response_size;
     }

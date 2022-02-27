@@ -58,7 +58,7 @@ enum ERR_REQ_UDS {
     ERR_REQ_UDS_UNH_SID = -3,
     ERR_REQ_UDS_CAN_WR = -4,
 };
-
+/*
 typedef struct {
     uint16_t can_id;
     uint8_t sid;
@@ -81,5 +81,5 @@ typedef struct {
     uint8_t *data;
     bool garbage;
 } pid_response_t;
-
+*/
 #endif /* __TRUDS_H */
