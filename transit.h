@@ -7,12 +7,21 @@
 
 using namespace std;
 
+#define PCM_CAN_ID 0x7E0
+#define BROADCAST_CAN_ID 0x7DF
+
 enum TransitBus {
     HS_CAN,
     MS_CAN,
 };
 
+/*
+enum TransitPIDs {
+    PID_PCM_ODOM,
+};
+
 struct PIDs {
+    TransitPIDs tp_enum;
     TransitBus bus;
     uint8_t service_mode; // OBD_SID or UDS_SID
     uint16_t pid;
@@ -23,8 +32,9 @@ struct PIDs {
 };
 
 static const PIDs pids[] = {
-    { HS_CAN, 0x22, 0xDD01, 1000,     "PCM.ODO",        "Odometer",                         "km/h" },
+    { PID_PCM_ODOM,         HS_CAN, 0x22, 0xDD01, 1000,     "PCM.ODO",        "Odometer",                         "km" },
 };
+*/
 
 class Transit
 {
@@ -40,6 +50,8 @@ public:
 
     bool initialize(const char *hs_can_interface, const char *ms_can_interface);
     void finalize();
+
+    bool get_odometer(uint32_t &result);
 };
 
 #endif

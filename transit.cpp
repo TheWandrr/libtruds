@@ -51,3 +51,15 @@ void Transit::finalize()
     end_can();
     //printf("returned from end_can\n");
 }
+
+bool Transit::get_odometer(uint32_t &result)
+{
+    byte32_t response;
+    int response_size;
+
+    result = 0;
+    response_size = request_uds((uint8_t *)&response, sizeof(response), PCM_CAN_ID, SID_RD_DATA_ID, 1, 0xDD01);
+    result = response.val;
+
+    return initialized && (response_size >= 0);
+}

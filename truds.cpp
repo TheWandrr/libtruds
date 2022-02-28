@@ -112,7 +112,7 @@ static void *rx_can(void *p) {
                 ( (frame.can_id & 0x700) == 0x700) ) { // Workaround for filter letting initial unmatching frame though
 
             // DEBUG //
-            print_can_frame(&frame);
+            //print_can_frame(&frame);
             // DEBUG //
 
             // If request was OBD2 broadcast address (0x7DF) then valid response is in the range 0x7E8-0x7EF
@@ -500,6 +500,7 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
         // DEBUG //
         printf("ERROR: UDS request timeout\n");
         // DEBUG //
+        uds_busy = false; // TODO: Verify that this does something useful
         return ERR_REQ_UDS_TIMEOUT;
     }
 

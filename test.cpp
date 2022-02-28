@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     }
 
     if(!tr.initialize(hs_can_interface, ms_can_interface)) {
-        printf("ERROR: Initialization of class Transit failed\n");
+        printf("ERROR: Initialization failed\n");
         exit(1);
     }
     //printf("tr.initialize completed without error\n");
@@ -52,11 +52,24 @@ int main(int argc, char **argv) {
     start_ms = timestamp();
 
     while(running) {
+
         now_ms = timestamp();
         if( (now_ms - start_ms) >= period_ms) {
             printf("[%lld] test.c main loop running\n", now_ms);
+
+
+            uint32_t odometer;
+            if (tr.get_odometer(odometer)) {
+                printf("Odometer: %d\n", odometer);
+            }
+            else {
+                printf("ERROR: Odometer not available\n");
+            }
+
+
             start_ms = now_ms;
         }
+
     }
 
     tr.finalize();
