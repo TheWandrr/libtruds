@@ -28,14 +28,18 @@ static const PIDs pids[] = {
 
 class Transit
 {
+
 private:
+    bool initialized;
     char ms_can[32];
     char hs_can[32];
+
 public:
-    Transit(char *hs_can_interface, char *ms_can_interface);
+    Transit();
     ~Transit();
 
-    //set_can_interface(TransitBus bus, char *can_interface);
+    bool initialize(const char *hs_can_interface, const char *ms_can_interface);
+    void finalize();
 };
 
 #endif

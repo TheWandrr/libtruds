@@ -1,5 +1,7 @@
+#This needs fixed/improved by someone who's actually good with makefiles...
 CC = g++
-CFLAGS = -Wall -fvisibility=hidden
+#CFLAGS = -Wall -fvisibility=hidden
+CFLAGS = -g -Wall -fvisibility=hidden
 LDFLAGS = -lpthread -L./ -ltruds
 OUTPUT_FILE = libtruds.a
 INSTALL_DIR = /usr/local/lib/truds
@@ -11,13 +13,13 @@ SOURCES = truds.cpp transit.cpp
 all: $(OUTPUT_FILE)
 
 test: test.cpp $(OUTPUT_FILE)
-	$(CC) test.cpp -o $@ $(LDFLAGS)
+	$(CC) -o $@ test.cpp transit.cpp $(LDFLAGS)
 
 $(OUTPUT_FILE): $(SOURCES:.cpp=.o)
 	ar r $@ $^
 	ranlib $@
 
-$(SOURCES:.c=.o): $(SOURCES)
+$(SOURCES:.cpp=.o): $(SOURCES)
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 .PHONY: install

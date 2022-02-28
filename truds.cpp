@@ -46,13 +46,14 @@
 
 //pthread_mutex_t lock_pid_request_list_access;
 
-int cansocket __attribute__ ((visibility ("hidden") ));
-bool running  __attribute__ ((visibility ("hidden") ));
-bool uds_busy __attribute__ ((visibility ("hidden") ));
-uds_response_t uds_response __attribute__ ((visibility ("hidden") ));
-uint16_t request_timeout_ms __attribute__ ((visibility ("hidden") ));
+bool _running;
 
-pthread_t rx_can_thread __attribute__ ((visibility ("hidden") ));
+static int cansocket;
+static bool uds_busy;
+static uds_response_t uds_response;
+static uint16_t request_timeout_ms;
+
+static pthread_t rx_can_thread;
 
 #warning Need to send periodic tester-present messages when in session?
 
@@ -90,17 +91,28 @@ static void *rx_can(void *p) {
     size_t data_bytes_left;
     size_t frame_data_offset;;
     uint8_t prev_frame_index;
+    uint64_t start_ms;
+    const unsigned int period_ms = 2000;
 
-    running = true;
+    //printf("rx_can thread started\n");
 
-    while(running) {
+    start_ms = timestamp();
+
+    while(_running) {
+        // DEBUG - Print a status message every (period_ms) milliseconds
+        if ((timestamp() - start_ms) >= period_ms) {
+            //printf("[%lld] rx_can thread is active\n", timestamp());
+            start_ms = timestamp();
+        }
+        // DEBUG
+
         nbytes = read(cansocket, &frame, sizeof(struct can_frame));
 
         if( (nbytes > 0) &&
                 ( (frame.can_id & 0x700) == 0x700) ) { // Workaround for filter letting initial unmatching frame though
 
             // DEBUG //
-            //print_can_frame(&frame);
+            print_can_frame(&frame);
             // DEBUG //
 
             // If request was OBD2 broadcast address (0x7DF) then valid response is in the range 0x7E8-0x7EF
@@ -384,7 +396,7 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
     uint64_t request_start_ms;
     bool timeout;
 
-    if (!running || uds_busy) {
+    if (!_running || uds_busy) {
         // DEBUG //
         printf("ERROR: UDS busy\n");
         // DEBUG //
@@ -477,7 +489,7 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
     }
 
     // Non-blocking wait for rx_can thread to receive response, or timeout
-    while( (running) &&
+    while( (_running) &&
             (uds_busy) &&
             (!timeout) ) {
         usleep(1000);
@@ -491,7 +503,7 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
         return ERR_REQ_UDS_TIMEOUT;
     }
 
-    if ( (running) &&
+    if ( (_running) &&
             (buff != NULL) ) {
         response_size = min(buff_max, uds_response.data_size);
         memset(buff, 0, buff_max);
@@ -524,39 +536,46 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
 int begin_can(char *can_iface_name) {
     struct sockaddr_can addr;
     struct ifreq ifr;
+    struct can_filter filter[1];
 
-    running = false;
+    _running = false;
     uds_busy = false;
     cansocket = -1;
+
     set_request_timeout_uds(250);
 
     if ((cansocket = socket(PF_CAN, SOCK_RAW, CAN_RAW)) < 0) {
         cansocket = -1;
-        return -1;
     }
+    else {
+        strcpy(ifr.ifr_name, can_iface_name);
+        ioctl(cansocket, SIOCGIFINDEX, &ifr);
+        fcntl(cansocket, F_SETFL, O_NONBLOCK);
 
-    strcpy(ifr.ifr_name, can_iface_name);
-    ioctl(cansocket, SIOCGIFINDEX, &ifr);
-    fcntl(cansocket, F_SETFL, O_NONBLOCK);
+        memset(&addr, 0, sizeof(addr));
+        addr.can_family = AF_CAN;
+        addr.can_ifindex = ifr.ifr_ifindex;
 
-    memset(&addr, 0, sizeof(addr));
-    addr.can_family = AF_CAN;
-    addr.can_ifindex = ifr.ifr_ifindex;
+        if (bind(cansocket, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+            printf("Error binding socket\n");
+            cansocket = -1;
+            return -1;
+        }
 
-    if (bind(cansocket, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        cansocket = -1;
-        return -1;
+        filter[0].can_id = 0x700;
+        filter[0].can_mask = 0x700;
+        setsockopt(cansocket, SOL_CAN_RAW, CAN_RAW_FILTER, &filter, sizeof(filter));
+
+        pthread_create(&rx_can_thread, NULL, rx_can, NULL);
+        //printf("returned from pthread_create\n");
+        _running = true;
     }
-
-    pthread_create(&rx_can_thread, NULL, rx_can, NULL);
-
-    running = true;
 
     return cansocket;
 }
 
 void end_can(void) {
-    running = false;
+    _running = false;
 
     pthread_join(rx_can_thread, NULL);
 
@@ -675,18 +694,22 @@ void parse_pid_data(uint16_t pid, uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7
     printf("parse_pid_data() ... PID %04X: %2X %2X %2X %2X\n", pid, d4, d5, d6, d7);
 }
 
-void init_can(char *can_interface) {
+/*
+bool init_can(char *can_interface) {
     struct can_filter filter[1];
 
     if ( (cansocket = begin_can(can_interface)) == -1 ) {
         printf("Could not start CAN interface '%s'\n", can_interface);
-        exit(1);
+        return false;
     }
 
     filter[0].can_id = 0x700;
     filter[0].can_mask = 0x700;
     setsockopt(cansocket, SOL_CAN_RAW, CAN_RAW_FILTER, &filter, sizeof(filter));
+
+    return true;
 }
+*/
 
 // TODO: Probably only one pending request per module is supported, so this can be redesigned a little...
 //          ... use reply_pending flag?  Only allow another send to a module if no replies pending from it?

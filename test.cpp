@@ -19,12 +19,16 @@ int main(int argc, char **argv) {
     char ms_can_interface[33];
     byte32_t response;
     size_t response_size;
+    const unsigned int  period_ms = 2000;
+    uint64_t start_ms;
+    uint64_t now_ms;
+    Transit tr;
 
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
     signal(SIGHUP, sig_handler);
 
-    if (argc < 2) {
+    if ( (argc < 2) || (argc > 3) ) {
         printf("USAGE: %s <HS-CAN-INTERFACE> <MS-CAN-INTERFACE>\n", argv[0]);
         printf("Using default 'HS-CAN <--> can0'.  Specify a different interface as an argument if desired.\n");
         strcpy(hs_can_interface, "can0");
@@ -39,7 +43,26 @@ int main(int argc, char **argv) {
         strncpy(ms_can_interface, argv[2], sizeof(ms_can_interface)-1);
     }
 
-    Transit tr(hs_can_interface, ms_can_interface);
+    if(!tr.initialize(hs_can_interface, ms_can_interface)) {
+        printf("ERROR: Initialization of class Transit failed\n");
+        exit(1);
+    }
+    //printf("tr.initialize completed without error\n");
+
+    start_ms = timestamp();
+
+    while(running) {
+        now_ms = timestamp();
+        if( (now_ms - start_ms) >= period_ms) {
+            printf("[%lld] test.c main loop running\n", now_ms);
+            start_ms = now_ms;
+        }
+    }
+
+    tr.finalize();
+
+    //exit(0);
+
 
 /*
     init_can(can_interface); // Exits program on error
