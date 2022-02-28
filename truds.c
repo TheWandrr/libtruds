@@ -173,6 +173,20 @@ static void *rx_can(void *p) {
                     uds_response.data_size = LNYBBLE8(frame.data[0]) - frame_data_offset + 1;
                     memcpy(uds_response.data, frame.data + frame_data_offset, uds_response.data_size);
                     uds_response.data_received = uds_response.data_size;
+
+                    // DEBUG
+                    //printf("frame.data --> ");
+                    //for (int i = 0; i < 8; i++) {
+                    //    printf("%0X", frame.data[i]);
+                    //}
+                    //printf("\n");
+                    //printf("uds_response.data --> ");
+                    //for (int i = 0; i < uds_response.data_size; i++) {
+                    //    printf("%0X", uds_response.data[i]);
+                    //}
+                    //printf("\n");
+                    // DEBUG
+
                 }
 
                 // First frame of multi-frame response
@@ -481,7 +495,25 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
             (buff != NULL) ) {
         response_size = min(buff_max, uds_response.data_size);
         memset(buff, 0, buff_max);
-        memcpy(buff, uds_response.data, response_size);
+        // TODO: Investigate whether there's a better way to swap the byte order here
+        //memcpy(buff, uds_response.data, response_size);
+        for (int i = 0; i < response_size; i++) {
+            buff[i] = uds_response.data[response_size - i - 1];
+        }
+
+        // DEBUG
+        //printf("buff: ");
+        //for (int i = 0; i < response_size; i++) {
+        //    printf("%0X ", buff[i]);
+        //}
+        //printf("\n");
+        //printf("uds_response.data: ");
+        //for (int i = 0; i < response_size; i++) {
+        //    printf("%0X ", uds_response.data[i]);
+        //}
+        //printf("\n");
+        // DEBUG
+
         return response_size;
     }
     else {

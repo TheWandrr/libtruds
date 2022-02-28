@@ -49,6 +49,12 @@ int main(int argc, char **argv) {
     printf("OBD2 Vehicle Speed: %d\n", response.val);
 
     // Ford Proprietary Requests
+    response_size = request_uds((uint8_t *)&response, sizeof(response.val), 0x7E0, SID_RD_DATA_ID, 1, 0x1E04);
+    printf("IN_GEAR: %d\n", (response.val == 0xA0) ? 0 : 1);
+
+    response_size = request_uds((uint8_t *)&response, sizeof(response.val), 0x7E0, SID_RD_DATA_ID, 1, 0x1E23); // PCM.TR
+    printf("IN_PARK: %d\n", (response.val == 0x46) ? 1 : 0);
+
     response_size = request_uds((uint8_t *)&response, sizeof(response.val), 0x7E0, SID_RD_DATA_ID, 1, 0x057D);
     printf("AAT_1: %d\n", response.val - 83);
 
@@ -61,6 +67,10 @@ int main(int argc, char **argv) {
 #warning "This one returns two bytes but they are not currently being handled properly!"
     response_size = request_uds((uint8_t *)&response, sizeof(response.val), 0x7E0, SID_RD_DATA_ID, 1, 0xF40C);
     printf("RPM: %0.1f\n", response.val / 4.0);
+
+#warning "This one returns four bytes but they are not currently being handled properly!"
+    response_size = request_uds((uint8_t *)&response, sizeof(response), 0x7E0, SID_RD_DATA_ID, 1, 0xDD01);
+    printf("Odometer: %d\n", response.val);
 
     /*
     // Raise RPM for 10 seconds
