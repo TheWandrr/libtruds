@@ -6,6 +6,7 @@
 
 #include "uds.h"
 #include "truds.h"
+#include "transit.h"
 
 bool running = true;
 
@@ -14,7 +15,8 @@ void sig_handler(int sig) {
 }
 
 int main(int argc, char **argv) {
-    char can_interface[65];
+    char hs_can_interface[33];
+    char ms_can_interface[33];
     byte32_t response;
     size_t response_size;
 
@@ -22,15 +24,24 @@ int main(int argc, char **argv) {
     signal(SIGTERM, sig_handler);
     signal(SIGHUP, sig_handler);
 
-    if (argc != 2) {
-        printf("USAGE: %s <CAN-INTERFACE>\n", argv[0]);
-        printf("Using default 'can0'.  Specify a different interface as an argument if desired.\n");
-        strcpy(can_interface, "can0");
+    if (argc < 2) {
+        printf("USAGE: %s <HS-CAN-INTERFACE> <MS-CAN-INTERFACE>\n", argv[0]);
+        printf("Using default 'HS-CAN <--> can0'.  Specify a different interface as an argument if desired.\n");
+        strcpy(hs_can_interface, "can0");
+        strcpy(ms_can_interface, "");
     }
-    else {
-        strncpy(can_interface, argv[1], sizeof(can_interface)-1);
+    else if (argc == 2) {
+        strncpy(hs_can_interface, argv[1], sizeof(hs_can_interface)-1);
+        strcpy(ms_can_interface, "");
+    }
+    else if (argc == 3) {
+        strncpy(hs_can_interface, argv[1], sizeof(hs_can_interface)-1);
+        strncpy(ms_can_interface, argv[2], sizeof(ms_can_interface)-1);
     }
 
+    Transit tr(hs_can_interface, ms_can_interface);
+
+/*
     init_can(can_interface); // Exits program on error
 
     // OBDII Requests
@@ -49,8 +60,8 @@ int main(int argc, char **argv) {
     printf("OBD2 Vehicle Speed: %d\n", response.val);
 
     // Ford Proprietary Requests
-    response_size = request_uds((uint8_t *)&response, sizeof(response.val), 0x7E0, SID_RD_DATA_ID, 1, 0x1E04);
-    printf("IN_GEAR: %d\n", (response.val == 0xA0) ? 0 : 1);
+//    response_size = request_uds((uint8_t *)&response, sizeof(response.val), 0x7E0, SID_RD_DATA_ID, 1, 0x1E04);
+//    printf("IN_GEAR: %d\n", (response.val == 0xA0) ? 0 : 1);
 
     response_size = request_uds((uint8_t *)&response, sizeof(response.val), 0x7E0, SID_RD_DATA_ID, 1, 0x1E23); // PCM.TR
     printf("IN_PARK: %d\n", (response.val == 0x46) ? 1 : 0);
@@ -71,6 +82,7 @@ int main(int argc, char **argv) {
 #warning "This one returns four bytes but they are not currently being handled properly!"
     response_size = request_uds((uint8_t *)&response, sizeof(response), 0x7E0, SID_RD_DATA_ID, 1, 0xDD01);
     printf("Odometer: %d\n", response.val);
+*/
 
     /*
     // Raise RPM for 10 seconds
@@ -101,5 +113,5 @@ int main(int argc, char **argv) {
     }
     */
 
-    end_can();
+    //end_can();
 }

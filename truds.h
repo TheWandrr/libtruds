@@ -5,19 +5,19 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-extern bool request_security(canid_t can_id);
-extern void init_can(char *can_interface);
-extern int begin_can(char *can_iface_name);
-extern void end_can(void);
-extern int send_tester_present_uds(canid_t can_id);
-extern int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, size_t n, ...);
-extern bool begin_session_uds(canid_t can_id, uint8_t type);
-extern bool end_session_uds(canid_t can_id);
-extern bool is_busy_uds(void);
-extern void set_request_timeout_uds(uint16_t new_timeout_ms);
-extern void print_can_frame(struct can_frame *frame);
-extern uint64_t timestamp(void);
-extern void replace(char *s, const char find, const char replace, size_t n);
+extern "C" bool request_security(canid_t can_id);
+extern "C" void init_can(char *can_interface);
+extern "C" int begin_can(char *can_iface_name);
+extern "C" void end_can(void);
+extern "C" int send_tester_present_uds(canid_t can_id);
+extern "C" int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, size_t n, ...);
+extern "C" bool begin_session_uds(canid_t can_id, uint8_t type);
+extern "C" bool end_session_uds(canid_t can_id);
+extern "C" bool is_busy_uds(void);
+extern "C" void set_request_timeout_uds(uint16_t new_timeout_ms);
+extern "C" void print_can_frame(struct can_frame *frame);
+extern "C" uint64_t timestamp(void);
+extern "C" void replace(char *s, const char find, const char replace, size_t n);
 
 #define HBYTE16(val) ((uint8_t)((val) >> 8))
 #define LBYTE16(val) ((uint8_t)(val))

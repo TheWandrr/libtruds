@@ -1,19 +1,19 @@
-CC = gcc
+CC = g++
 CFLAGS = -Wall -fvisibility=hidden
 LDFLAGS = -lpthread -L./ -ltruds
 OUTPUT_FILE = libtruds.a
 INSTALL_DIR = /usr/local/lib/truds
 CLEAN_EXT = o a d
 CLEAN_FILES = test
-SOURCES = truds.c
+SOURCES = truds.cpp transit.cpp
 
 .PHONY: all
 all: $(OUTPUT_FILE)
 
-test: test.c $(OUTPUT_FILE)
-	$(CC) test.c -o $@ $(LDFLAGS)
+test: test.cpp $(OUTPUT_FILE)
+	$(CC) test.cpp -o $@ $(LDFLAGS)
 
-$(OUTPUT_FILE): $(SOURCES:.c=.o)
+$(OUTPUT_FILE): $(SOURCES:.cpp=.o)
 	ar r $@ $^
 	ranlib $@
 
