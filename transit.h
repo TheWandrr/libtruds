@@ -7,9 +7,6 @@
 
 using namespace std;
 
-#define PCM_CAN_ID 0x7E0
-#define BROADCAST_CAN_ID 0x7DF
-
 enum TransitBus {
     HS_CAN,
     MS_CAN,
@@ -51,7 +48,12 @@ public:
     bool initialize(const char *hs_can_interface, const char *ms_can_interface);
     void finalize();
 
+    // TODO: Getters/setters should return more detailed status codes
     bool get_odometer(uint32_t &result);
+    bool get_rpm(uint32_t &result);
+
+    bool control_rpm(bool enabled, uint16_t desired_rpm);
+    bool control_rpm(bool enabled);
 };
 
 #endif

@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-extern "C" bool request_security(canid_t can_id);
+extern "C" bool request_security_uds(canid_t can_id);
 extern "C" bool init_can(char *can_interface);
 extern "C" int begin_can(char *can_iface_name);
 extern "C" void end_can(void);
@@ -18,6 +18,7 @@ extern "C" void set_request_timeout_uds(uint16_t new_timeout_ms);
 extern "C" void print_can_frame(struct can_frame *frame);
 extern "C" uint64_t timestamp(void);
 extern "C" void replace(char *s, const char find, const char replace, size_t n);
+extern "C" void set_tester_present(bool enabled, uint16_t period);
 
 #define HBYTE16(val) ((uint8_t)((val) >> 8))
 #define LBYTE16(val) ((uint8_t)(val))

@@ -19,9 +19,9 @@ int main(int argc, char **argv) {
     char ms_can_interface[33];
     byte32_t response;
     size_t response_size;
-    const unsigned int  period_ms = 2000;
-    uint64_t start_ms;
+    uint64_t start1_ms, start2_ms;
     uint64_t now_ms;
+    bool high_idle = false;
     Transit tr;
 
     signal(SIGINT, sig_handler);
@@ -49,32 +49,50 @@ int main(int argc, char **argv) {
     }
     //printf("tr.initialize completed without error\n");
 
-    start_ms = timestamp();
+    start1_ms = timestamp();
 
     while(running) {
 
-        now_ms = timestamp();
-        if( (now_ms - start_ms) >= period_ms) {
-            printf("[%lld] test.c main loop running\n", now_ms);
 
+        // This block is executed every 1000ms
+        if( ( (now_ms = timestamp()) - start1_ms ) >= 1000) {
+            //printf("[%lld] test.c main loop running\n", now_ms);
 
-            uint32_t odometer;
-            if (tr.get_odometer(odometer)) {
-                printf("Odometer: %d\n", odometer);
+            uint32_t rpm;
+            if (tr.get_rpm(rpm)) {
+                printf("RPM: %d\n", rpm);
             }
             else {
-                printf("ERROR: Odometer not available\n");
+                printf("ERROR: RPM not available\n");
             }
 
-
-            start_ms = now_ms;
+            start1_ms = now_ms;
         }
 
+        // This block is executed every 10000ms
+        if( ( (now_ms = timestamp()) - start2_ms ) >= 10000) {
+            printf("[%lld] %s high idle\n", now_ms, high_idle ? "clearing" : "setting");
+
+            uint16_t rpm_desired = 1250;
+
+            if(high_idle) {
+                if (!tr.control_rpm(true, rpm_desired)) {
+                    printf("ERROR: Could not control RPM to %d\n", rpm_desired);
+                }
+            }
+            else {
+                if (!tr.control_rpm(false, 0)) {
+                    printf("ERROR: Could not stop RPM control\n");
+                }
+            }
+
+            high_idle = !high_idle;
+            start2_ms = now_ms;
+        }
     }
 
     tr.finalize();
 
-    //exit(0);
 
 
 /*

@@ -1,7 +1,8 @@
 #ifndef __UDS_H
 #define __UDS_H
 
-#define SID_NEG_RESP 0x7F
+#define PCM_CAN_ID 0x7E0
+#define BROADCAST_CAN_ID 0x7DF
 
 enum OBD_SID {
     SID_SHOW_CURR_DATA =        0x01,

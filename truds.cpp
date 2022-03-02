@@ -52,8 +52,11 @@ static int cansocket;
 static bool uds_busy;
 static uds_response_t uds_response;
 static uint16_t request_timeout_ms;
+static bool enable_tester_present;
+static uint16_t tester_present_period;
 
 static pthread_t rx_can_thread;
+static pthread_t tester_present_thread;
 
 #warning Need to send periodic tester-present messages when in session?
 
@@ -82,6 +85,23 @@ void print_can_frame(struct can_frame *frame) {
 
     printf("\n");
     fflush(NULL);
+}
+
+static void *tester_present(void *p) {
+    while(_running) {
+        if(enable_tester_present) {
+            send_tester_present_uds(PCM_CAN_ID);
+            usleep(tester_present_period * 1000);
+        }
+        else {
+            usleep(10000);
+        }
+    }
+}
+
+void set_tester_present(bool enabled, uint16_t period) {
+    enable_tester_present = enabled;
+    tester_present_period = period; // TODO: Range check
 }
 
 static void *rx_can(void *p) {
@@ -142,7 +162,7 @@ static void *rx_can(void *p) {
                     //printf("ISO-TP-0 Single frame response\n"); fflush(NULL);
                     // DEBUG //
 
-                    if (frame.data[1] == SID_NEG_RESP) {
+                    if (frame.data[1] == UDS_ERR_SNSIAS) {
 #warning "Add detailed error handling"
                         // TODO: Process the rest of this code to determine more detailed information about the error.
                         // See softing poster?
@@ -328,14 +348,24 @@ bool begin_session_uds(canid_t can_id, uint8_t type) {
     int response_size;
 
     // TODO: Decode/use response bytes
+    // TODO: Response may be as follows:
+    //       06 50 03 aa bb cc dd
+    //       Where:
+    //          aa bb is P1 performance timer value
+    //          cc dd is P2 extended performance timer value
+    //
+    //       This is the minimum time before which the server nas to send a response. If unable, it sends NRC-78, request received response pending
+    //       It then must send a response within 0x01FF - P2 extended performance timer 
+    //       see: [ https://karthik-balu.github.io/projects/2017/11/23/Diving-into-UDS ]
     response_size = request_uds((uint8_t *)&response, sizeof(response), can_id, SID_DIAG_SESS_CTRL, 1, UDS_DIAG_EXTENDED);
 
     if ((response_size == 4) &&
-            (response.byte[0] != SID_NEG_RESP)) {
+            (response.byte[0] != UDS_ERR_SNSIAS)) {
 
-#warning CODE STUB - create node in session tracking list
+#warning "CODE STUB - If the request succeeded, set a flag indicating we're in a session. Don't try to start a new session."
+        // TODO: Also, account for multiple PIDs being controlled.
 
-        send_tester_present_uds(can_id);
+        send_tester_present_uds(can_id); // Not sure if this is actually required
         return true;
     }
     else {
@@ -351,9 +381,10 @@ bool end_session_uds(canid_t can_id) {
     response_size = request_uds((uint8_t *)&response, sizeof(response), can_id, SID_DIAG_SESS_CTRL, 1, UDS_DIAG_DEFAULT);
 
     if ((response_size == 4) &&
-            (response.byte[0] != SID_NEG_RESP)) {
+            (response.byte[0] != UDS_ERR_SNSIAS)) {
 
-#warning CODE STUB - remove node in session tracking list
+#warning "CODE STUB - Clear flag that indicates we're in a session"
+        // TODO: Also, account for multiple PIDs being controlled.
 
         return true;
     }
@@ -500,7 +531,7 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
         // DEBUG //
         printf("ERROR: UDS request timeout\n");
         // DEBUG //
-        uds_busy = false; // TODO: Verify that this does something useful
+        uds_busy = false; // TODO: We need to do this to try again, but how do we know it isn't busy?
         return ERR_REQ_UDS_TIMEOUT;
     }
 
@@ -568,7 +599,8 @@ int begin_can(char *can_iface_name) {
         setsockopt(cansocket, SOL_CAN_RAW, CAN_RAW_FILTER, &filter, sizeof(filter));
 
         pthread_create(&rx_can_thread, NULL, rx_can, NULL);
-        //printf("returned from pthread_create\n");
+        pthread_create(&tester_present_thread, NULL, tester_present, NULL);
+
         _running = true;
     }
 
@@ -579,6 +611,7 @@ void end_can(void) {
     _running = false;
 
     pthread_join(rx_can_thread, NULL);
+    pthread_join(tester_present_thread, NULL);
 
     if(cansocket > 0) {
         close(cansocket);
@@ -905,7 +938,7 @@ int32_t key_from_seed(canid_t can_id, int32_t seed) {
     return result;
 }
 
-bool request_security(canid_t can_id) {
+bool request_security_uds(canid_t can_id) {
     byte32_t response;
     int result;
     byte32_t key;
@@ -919,7 +952,7 @@ bool request_security(canid_t can_id) {
     result = request_uds((uint8_t *)&response, sizeof(response), can_id, SID_SEC_ACCESS, 1, 3);
 
     if ((result == 3) &&
-            (response.byte[0] != SID_NEG_RESP)) {
+            (response.byte[0] != UDS_ERR_SNSIAS)) {
 
         seed.byte[3] = 0;
         seed.byte[2] = response.byte[0];
