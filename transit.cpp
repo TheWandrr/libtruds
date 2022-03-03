@@ -53,6 +53,11 @@ void Transit::finalize()
     end_can();
 }
 
+bool Transit::get_vin(char *result)
+{
+    #warning "CODE STUB"
+}
+
 bool Transit::get_odometer(uint32_t &result)
 {
     byte32_t response;

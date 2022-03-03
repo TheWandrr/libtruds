@@ -49,6 +49,7 @@ public:
     void finalize();
 
     // TODO: Getters/setters should return more detailed status codes
+    bool get_vin(char *result);
     bool get_odometer(uint32_t &result);
     bool get_rpm(uint32_t &result);
 

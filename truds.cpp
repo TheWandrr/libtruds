@@ -728,7 +728,7 @@ void parse_pid_data(uint16_t pid, uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7
     printf("parse_pid_data() ... PID %04X: %2X %2X %2X %2X\n", pid, d4, d5, d6, d7);
 }
 
-/*
+#warning "Not used by Transit class, remove when working completely"
 bool init_can(char *can_interface) {
     struct can_filter filter[1];
 
@@ -743,7 +743,6 @@ bool init_can(char *can_interface) {
 
     return true;
 }
-*/
 
 // TODO: Probably only one pending request per module is supported, so this can be redesigned a little...
 //          ... use reply_pending flag?  Only allow another send to a module if no replies pending from it?

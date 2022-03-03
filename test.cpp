@@ -28,6 +28,9 @@ int main(int argc, char **argv) {
     signal(SIGTERM, sig_handler);
     signal(SIGHUP, sig_handler);
 
+    // NEW CODE
+
+    /*
     if ( (argc < 2) || (argc > 3) ) {
         printf("USAGE: %s <HS-CAN-INTERFACE> <MS-CAN-INTERFACE>\n", argv[0]);
         printf("Using default 'HS-CAN <--> can0'.  Specify a different interface as an argument if desired.\n");
@@ -75,7 +78,7 @@ int main(int argc, char **argv) {
 
             uint16_t rpm_desired = 1250;
 
-            if(high_idle) {
+            if(!high_idle) {
                 if (!tr.control_rpm(true, rpm_desired)) {
                     printf("ERROR: Could not control RPM to %d\n", rpm_desired);
                 }
@@ -92,12 +95,16 @@ int main(int argc, char **argv) {
     }
 
     tr.finalize();
+*/
 
 
 
-/*
+// OLD CODE - KEEP UNTIL OTHER IS WORKING
+    char can_interface[33];
+    strcpy(can_interface,  "can0");
     init_can(can_interface); // Exits program on error
 
+/*
     // OBDII Requests
     response_size = request_uds((uint8_t *)&response, sizeof(response), 0x7DF, SID_SHOW_CURR_DATA, 1, 0x05);
     printf("OBD2 Engine Coolant Temperature: %d\n", response.val - 40);
@@ -138,10 +145,9 @@ int main(int argc, char **argv) {
     printf("Odometer: %d\n", response.val);
 */
 
-    /*
     // Raise RPM for 10 seconds
     if(begin_session_uds(0x7E0, UDS_DIAG_EXTENDED)) {
-        if(request_security(0x7E0)) {
+        if(request_security_uds(0x7E0)) {
 
         // Set engine RPM for x milliseconds
         uint64_t start_ms;
@@ -165,7 +171,6 @@ int main(int argc, char **argv) {
 
         end_session_uds(0x7E0);
     }
-    */
 
-    //end_can();
+    end_can();
 }
