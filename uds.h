@@ -71,18 +71,24 @@ enum UDS_DIAG_SESS_TYPE {
 };
 
 enum UDS_ERR {
+    // 0x01..0x0F Reserved by ISO SAE
     UDS_ERR_GR =                0x10, // General reject
     UDS_ERR_SNS =               0x11, // Service not supported
     UDS_ERR_SFNS =              0x12, // Sub-function not supported
     UDS_ERR_IMLOIF =            0x13, // Incorrect message length or invalid format
     UDS_ERR_RTL =               0x14, // Response too long
+    // 0x15..0x20 Reserved by ISO SAE
     UDS_ERR_BRR =               0x21, // Busy repeat request
     UDS_ERR_CNC =               0x22, // Conditions not correct
+    // 0x23 Reserved by ISO SAE
     UDS_ERR_RSE =               0x24, // Reset sequence error
     UDS_ERR_NRFSC =             0x25, // No response from sub-net component
     UDS_ERR_FPEORA =            0x26, // Failure prevents execution of requested action
+    // 0x27..0x30 Reserved by ISO SAE
     UDS_ERR_ROOR =              0x31, // Request out of range
+    // 0x32 Reserved by ISO SAE
     UDS_ERR_SAD =               0x33, // Security access denied
+    // 0x34 Reserved by ISO SAE
     UDS_ERR_IK =                0x35, // Invalid key
     UDS_ERR_ENOA =              0x36, // Exceeded number of attempts
     UDS_ERR_RTDNE =             0x37, // Required time delay not expired
@@ -91,9 +97,34 @@ enum UDS_ERR {
     UDS_ERR_TDS =               0x71, // Transfer data suspended
     UDS_ERR_GPF =               0x72, // General programming failure
     UDS_ERR_WBSC =              0x73, // Wrong block sequence counter
+    // 0x74..0x77 Reserved by ISO SAE
     UDS_ERR_RCRRP =             0x78, // Request received correctly but response is pending
+    // 0x79..0x7D Reserved by ISO SAE
     UDS_ERR_SFNSIAS =           0x7E, // Subfunction not supported in active session
     UDS_ERR_SNSIAS =            0x7F, // Service not supported in active session
+    // 0x80 Reserved by ISO SAE
+    UDS_ERR_RPMHIGH =           0x81, // RPM too high
+    UDS_ERR_RPMLOW =            0x82, // RPM too low
+    UDS_ERR_ENGRUN =            0x83, // Engine is running
+    UDS_ERR_ENGSTOP =           0x84, // Engine is not running
+    UDS_ERR_ENGRTLOW =          0x85, // Engine run time too low
+    UDS_ERR_TEMPHIGH =          0x86, // Temperature is too high
+    UDS_ERR_TEMPLOW =           0x87, // Temperature is too low
+    UDS_ERR_SPDHIGH =           0x88, // Vehicle speed too high
+    UDS_ERR_SPDLOW =            0x89, // Vehicle speed too low
+    UDS_ERR_THRHIGH =           0x8A, // Throttle pedal is too high
+    UDS_ERR_THRLOW =            0x8A, // Throttle pedal is too low
+    UDS_ERR_TRNNTRL =           0x8B, // Transmission range not in neutral
+    UDS_ERR_TRNGEAR =           0x8B, // Transmission range not in gear
+    // 0x8E Reserved by ISO SAE
+    UDS_ERR_BRKOFF =            0x8F, // Brake pedal not applied
+    UDS_ERR_TRNPARK =           0x90, // Transmission range not in park
+    UDS_ERR_TCLOCK =            0x91, // Torque converter is locked
+    UDS_ERR_VHIGH =             0x92, // Voltage is too high
+    UDS_ERR_VLOW =              0x93, // Voltage is too low
+    // 0x94..0xEF Reserved for specific conditions not correct
+    // 0xF0..0xFE Vehicle manufacturer specific conditions not correct
+    // 0xFF Reserved by ISO SAE
 };
 
 #endif /* __UDS_H */
