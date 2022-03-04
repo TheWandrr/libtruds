@@ -30,7 +30,6 @@ int main(int argc, char **argv) {
 
     // NEW CODE
 
-    /*
     if ( (argc < 2) || (argc > 3) ) {
         printf("USAGE: %s <HS-CAN-INTERFACE> <MS-CAN-INTERFACE>\n", argv[0]);
         printf("Using default 'HS-CAN <--> can0'.  Specify a different interface as an argument if desired.\n");
@@ -51,6 +50,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
     //printf("tr.initialize completed without error\n");
+    /*
 
     start1_ms = timestamp();
 
@@ -100,11 +100,11 @@ int main(int argc, char **argv) {
 
 
 // OLD CODE - KEEP UNTIL OTHER IS WORKING
-    char can_interface[33];
-    strcpy(can_interface,  "can0");
-    init_can(can_interface); // Exits program on error
+    //char can_interface[33];
+    //strcpy(can_interface,  "can0");
+    //init_can(can_interface); // Exits program on error
 
-/*
+
     // OBDII Requests
     response_size = request_uds((uint8_t *)&response, sizeof(response), 0x7DF, SID_SHOW_CURR_DATA, 1, 0x05);
     printf("OBD2 Engine Coolant Temperature: %d\n", response.val - 40);
@@ -136,6 +136,10 @@ int main(int argc, char **argv) {
     response_size = request_uds((uint8_t *)&response, sizeof(response.val), 0x7E0, SID_RD_DATA_ID, 1, 0xF405);
     printf("ECT: %d\n", response.val - 40);
 
+    // UNTESTED (alternative OBD2 0x0C)
+    response_size = request_uds((uint8_t *)&response, sizeof(response.val), 0x7E0, SID_RD_DATA_ID, 1, 0x1505);
+    printf("VSS: %d\n", response.val);
+
 #warning "This one returns two bytes but they are not currently being handled properly!"
     response_size = request_uds((uint8_t *)&response, sizeof(response.val), 0x7E0, SID_RD_DATA_ID, 1, 0xF40C);
     printf("RPM: %0.1f\n", response.val / 4.0);
@@ -143,33 +147,39 @@ int main(int argc, char **argv) {
 #warning "This one returns four bytes but they are not currently being handled properly!"
     response_size = request_uds((uint8_t *)&response, sizeof(response), 0x7E0, SID_RD_DATA_ID, 1, 0xDD01);
     printf("Odometer: %d\n", response.val);
-*/
+
 
     // Raise RPM for 10 seconds
     if(begin_session_uds(0x7E0, UDS_DIAG_EXTENDED)) {
         if(request_security_uds(0x7E0)) {
 
-        // Set engine RPM for x milliseconds
-        uint64_t start_ms;
-        const uint32_t runtime_ms = 10000;
+            uint64_t start_ms;
+            const uint32_t runtime_ms = 10000;
 
-        // NOTE: Timing and presence of tester_present seems to be picky. Haven't found a standard yet.
-        send_tester_present_uds(0x7E0);
-        request_uds(NULL, 0, 0x7E0, SID_IO_CTRL_ID, 4,
-                    0x0308, 0x03, 0x04, 0xD2);
-
-        while ((timestamp() - start_ms) < 1) {};
-        send_tester_present_uds(0x7E0);
-
-        start_ms = timestamp();
-
-        while ((timestamp() - start_ms) < runtime_ms) {
+            // NOTE: Timing and presence of tester_present seems to be picky. Haven't found a standard yet.
+            // May also work if reading a pid frequently, but also sending less frequent tester_present (4 second interval??)
             send_tester_present_uds(0x7E0);
-            usleep(100);
+            request_uds(NULL, 0, 0x7E0, SID_IO_CTRL_ID, 4,
+                        0x0308, 0x03, 0x04, 0xD2);
+
+            while ((timestamp() - start_ms) < 1) {};
+            send_tester_present_uds(0x7E0);
+
+            start_ms = timestamp();
+
+            while ((timestamp() - start_ms) < runtime_ms) {
+                send_tester_present_uds(0x7E0);
+                usleep(100);
+            }
         }
+        else {
+            printf("ERROR: request_security_uds() failed\n");
         }
 
         end_session_uds(0x7E0);
+    }
+    else {
+        printf("ERROR: begin_session_uds() failed\n");
     }
 
     end_can();

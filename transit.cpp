@@ -43,6 +43,8 @@ bool Transit::initialize(const char *hs_can_interface, const char *ms_can_interf
     //    init_can(ms_can);
     //}
 
+    set_request_timeout_uds(750);
+
     initialized = true;
     return true;
 }

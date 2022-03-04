@@ -19,6 +19,7 @@ extern "C" void print_can_frame(struct can_frame *frame);
 extern "C" uint64_t timestamp(void);
 extern "C" void replace(char *s, const char find, const char replace, size_t n);
 extern "C" void set_tester_present(bool enabled, uint16_t period);
+extern "C" void set_request_timeout_uds(uint16_t new_request_timeout_ms);
 
 #define HBYTE16(val) ((uint8_t)((val) >> 8))
 #define LBYTE16(val) ((uint8_t)(val))

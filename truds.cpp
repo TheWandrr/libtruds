@@ -167,9 +167,10 @@ static void *rx_can(void *p) {
                         // TODO: Process the rest of this code to determine more detailed information about the error.
                         // See softing poster?
 
-                        printf("ERROR: Request could not be satisfied\n");
+                        printf("ERROR: Request could not be satisfied -> ");
+                        print_can_frame(&frame);
                         fflush(NULL);
-                        return NULL;
+                        return NULL; // TODO: This may need to be removed, but not sure. It is a valid response so let it continue and process the returned error response.
                     }
 
                     // Convert response SID into original request SID
@@ -425,7 +426,7 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
     int response_size;
     int vardata[8] = {0,0,0,0,0,0,0,0};
     uint64_t request_start_ms;
-    bool timeout;
+    bool timeout = false;
 
     if (!_running || uds_busy) {
         // DEBUG //
@@ -520,16 +521,18 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
     }
 
     // Non-blocking wait for rx_can thread to receive response, or timeout
+    uint64_t elapsed_ms;
     while( (_running) &&
             (uds_busy) &&
             (!timeout) ) {
         usleep(1000);
-        timeout = (timestamp() - request_start_ms) > request_timeout_ms;
+        elapsed_ms = timestamp() - request_start_ms;
+        timeout = (elapsed_ms > request_timeout_ms);
     }
 
     if (timeout) {
         // DEBUG //
-        printf("ERROR: UDS request timeout\n");
+        printf("ERROR: UDS request timeout [elapsed = %lld, request_timeout_ms = %d]\n", elapsed_ms, request_timeout_ms);
         // DEBUG //
         uds_busy = false; // TODO: We need to do this to try again, but how do we know it isn't busy?
         return ERR_REQ_UDS_TIMEOUT;
@@ -950,8 +953,7 @@ bool request_security_uds(canid_t can_id) {
 
     result = request_uds((uint8_t *)&response, sizeof(response), can_id, SID_SEC_ACCESS, 1, 3);
 
-    if ((result == 3) &&
-            (response.byte[0] != UDS_ERR_SNSIAS)) {
+    if ((result == 3) && (response.byte[0] != UDS_ERR_SNSIAS)) {
 
         seed.byte[3] = 0;
         seed.byte[2] = response.byte[0];
@@ -971,14 +973,14 @@ bool request_security_uds(canid_t can_id) {
         result = request_uds((uint8_t *)&response, sizeof(response), can_id, SID_SEC_ACCESS, 4,
                              4, key.byte[2], key.byte[1], key.byte[0]);
 
-#warning TODO Check what negative security access response looks like
-        if (result == 0) {
-            return true;
-        }
-        else {
-            return false;
-        }
+        return (result == 0) ? true : false;
     }
+    else if ((result == 4) && (response.byte[0] == UDS_ERR_SNSIAS)) {
+        printf("ERROR: Negative response from server for security access\n");
+        // TODO: Try to decode the rest of the negative response bytes
+    }
+
+    return false;
 }
 
 /*
