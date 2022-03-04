@@ -80,7 +80,7 @@ enum UDS_ERR {
     // 0x15..0x20 Reserved by ISO SAE
     UDS_ERR_BRR =               0x21, // Busy repeat request
     UDS_ERR_CNC =               0x22, // Conditions not correct
-    // 0x23 Reserved by ISO SAE
+    UDS_ERR_RNC =               0x23, // Routine not complete (or reserved by ISO SAE)
     UDS_ERR_RSE =               0x24, // Reset sequence error
     UDS_ERR_NRFSC =             0x25, // No response from sub-net component
     UDS_ERR_FPEORA =            0x26, // Failure prevents execution of requested action
@@ -93,16 +93,28 @@ enum UDS_ERR {
     UDS_ERR_ENOA =              0x36, // Exceeded number of attempts
     UDS_ERR_RTDNE =             0x37, // Required time delay not expired
     // 0x38..0x4F Reserved by extended data link security document
+    UDS_ERR_IDT =               0x41, // Incorrect download type (or reserved)
+    UDS_ERR_CDSA =              0x42, // Cannot download to specified address (or reserved)
+    UDS_ERR_CDNBR=              0x43, // Cannot download number of bytes requested (or reserved)
+    UDS_ERR_UNA =               0x50, // Upload not accepted (or reserved)
+    UDS_ERR_IUT =               0x51, // Incorrect upload type (or reserved)
+    UDS_ERR_CUSA =              0x52, // Cannot upload from specified address (or reserved)
+    UDS_ERR_CUNBR =             0x53, // Cannot upload number of bytes requested (or reserved)
     UDS_ERR_UDNA =              0x70, // Upload/download not accepted
     UDS_ERR_TDS =               0x71, // Transfer data suspended
     UDS_ERR_GPF =               0x72, // General programming failure
     UDS_ERR_WBSC =              0x73, // Wrong block sequence counter
     // 0x74..0x77 Reserved by ISO SAE
+    UDS_ERR_IABT =              0x74, // Illegal address in block transfer (or reserved)
+    UDS_ERR_INBBT =             0x75, // Illegal number of bytes in block transfer (or reserved)
+    UDS_ERR_IBTT =              0x76, // Illegal block transfer type (or reserved)
+    UDS_ERR_BTDCE =             0x77, // Block transfer data checksum error (or reserved)
     UDS_ERR_RCRRP =             0x78, // Request received correctly but response is pending
     // 0x79..0x7D Reserved by ISO SAE
+    UDS_ERR_IBCDBT =            0x79, // Incorrect byte count during block transfer (or reserved)
     UDS_ERR_SFNSIAS =           0x7E, // Subfunction not supported in active session
     UDS_ERR_SNSIAS =            0x7F, // Service not supported in active session
-    // 0x80 Reserved by ISO SAE
+    UDS_ERR_SNSIADM =           0x80, // Service not supported in active diagnostic mode (or  reserved by ISO SAE)
     UDS_ERR_RPMHIGH =           0x81, // RPM too high
     UDS_ERR_RPMLOW =            0x82, // RPM too low
     UDS_ERR_ENGRUN =            0x83, // Engine is running
