@@ -955,10 +955,7 @@ bool request_security_uds(canid_t can_id) {
 
     if ((result == 3) && (response.byte[0] != UDS_ERR_SNSIAS)) {
 
-        seed.byte[3] = 0;
-        seed.byte[2] = response.byte[0];
-        seed.byte[1] = response.byte[1];
-        seed.byte[0] = response.byte[2];
+        seed.val = response.val; // NOTE: The byte order is swapped from earlier versions!
 
         // DEBUG //
         //printf("SECURITY CHALLENGE: %06X\n", seed.val);
