@@ -1,7 +1,6 @@
 #ifndef __UDS_H
 #define __UDS_H
 
-#define PCM_CAN_ID 0x7E0
 #define BROADCAST_CAN_ID 0x7DF
 
 enum OBD_SID {

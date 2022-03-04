@@ -18,6 +18,8 @@ Transit::~Transit()
 
 bool Transit::initialize(const char *hs_can_interface, const char *ms_can_interface)
 {
+    // TODO: Add physical hardware and code for MS-CAN (250kbps) and I-CAN(500kbps)
+
     //printf("hs_can_interface: [%s], ms_can_interface: [%s]\n", hs_can_interface, ms_can_interface);
 
     // TODO: Check that interfaces are valid, signal failure and don't continue
@@ -51,7 +53,7 @@ bool Transit::initialize(const char *hs_can_interface, const char *ms_can_interf
 
 void Transit::finalize()
 {
-    end_session_uds(PCM_CAN_ID);
+    end_session_uds(TM_PCM_ID);
     end_can();
 }
 
@@ -66,7 +68,7 @@ bool Transit::get_odometer(uint32_t &result)
     int response_size;
 
     result = 0;
-    response_size = request_uds((uint8_t *)&response, sizeof(response), PCM_CAN_ID, SID_RD_DATA_ID, 1, 0xDD01);
+    response_size = request_uds((uint8_t *)&response, sizeof(response), TM_PCM_ID, SID_RD_DATA_ID, 1, 0xDD01);
     result = response.val;
 
     return initialized && (response_size >= 0);
@@ -90,11 +92,11 @@ bool Transit::control_rpm(bool enabled, uint16_t rpm_desired)
     int response_size;
 
     if (enabled) {
-        if (begin_session_uds(PCM_CAN_ID, UDS_DIAG_EXTENDED)) {
-            if (request_security_uds(PCM_CAN_ID)) {
+        if (begin_session_uds(TM_PCM_ID, UDS_DIAG_EXTENDED)) {
+            if (request_security_uds(TM_PCM_ID)) {
                 set_tester_present(true, 1000); // TODO: Period?? Guess!
 
-                response_size = request_uds(NULL, 0, PCM_CAN_ID,  SID_IO_CTRL_ID, 4, 0x0308, 0x03, HBYTE16(rpm_desired), LBYTE16(rpm_desired) );
+                response_size = request_uds(NULL, 0, TM_PCM_ID,  SID_IO_CTRL_ID, 4, 0x0308, 0x03, HBYTE16(rpm_desired), LBYTE16(rpm_desired) );
 
                 return initialized && (response_size >= 0);
             }
@@ -108,7 +110,7 @@ bool Transit::control_rpm(bool enabled, uint16_t rpm_desired)
     }
     else {
         set_tester_present(false, 0);
-        end_session_uds(PCM_CAN_ID);
+        end_session_uds(TM_PCM_ID);
     }
 
 }

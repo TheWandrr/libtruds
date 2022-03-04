@@ -20,9 +20,11 @@
 
 #include "uds.h"
 #include "truds.h"
+#include "transit.h"
 
 // TODO: Major cleanup after restructuring, remove unused
 // TODO: Refactor as object to handle connection to multiple CAN busses
+// TODO: Consider using an iso-tp library instead of custom code
 
 //------------- OLD COMMENTS BELOW HERE -----------------------
 
@@ -90,7 +92,7 @@ void print_can_frame(struct can_frame *frame) {
 static void *tester_present(void *p) {
     while(_running) {
         if(enable_tester_present) {
-            send_tester_present_uds(PCM_CAN_ID);
+            send_tester_present_uds(TM_PCM_ID);
             usleep(tester_present_period * 1000);
         }
         else {
