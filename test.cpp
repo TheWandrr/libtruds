@@ -159,6 +159,7 @@ int main(int argc, char **argv) {
             // NOTE: Timing and presence of tester_present seems to be picky. Haven't found a standard yet.
             // May also work if reading a pid frequently, but also sending less frequent tester_present (4 second interval??)
             send_tester_present_uds(0x7E0);
+            usleep(10000); // This might be needed to prevent requests too quickly
             request_uds(NULL, 0, 0x7E0, SID_IO_CTRL_ID, 4,
                         0x0308, 0x03, 0x04, 0xD2);
 
