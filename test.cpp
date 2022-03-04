@@ -140,11 +140,9 @@ int main(int argc, char **argv) {
     response_size = request_uds((uint8_t *)&response, sizeof(response.val), 0x7E0, SID_RD_DATA_ID, 1, 0x1505);
     printf("VSS: %d\n", response.val);
 
-#warning "This one returns two bytes but they are not currently being handled properly!"
     response_size = request_uds((uint8_t *)&response, sizeof(response.val), 0x7E0, SID_RD_DATA_ID, 1, 0xF40C);
     printf("RPM: %0.1f\n", response.val / 4.0);
 
-#warning "This one returns four bytes but they are not currently being handled properly!"
     response_size = request_uds((uint8_t *)&response, sizeof(response), 0x7E0, SID_RD_DATA_ID, 1, 0xDD01);
     printf("Odometer: %d\n", response.val);
 
@@ -167,10 +165,19 @@ int main(int argc, char **argv) {
             send_tester_present_uds(0x7E0);
 
             start_ms = timestamp();
+            start1_ms = timestamp();
 
             while ((timestamp() - start_ms) < runtime_ms) {
                 send_tester_present_uds(0x7E0);
                 usleep(100);
+
+                // Fetch and display actual RPM
+                if( ( (now_ms = timestamp()) - start1_ms ) >= 1000) {
+                    response_size = request_uds((uint8_t *)&response, sizeof(response.val), 0x7E0, SID_RD_DATA_ID, 1, 0xF40C);
+                    printf("RPM: %0.1f\n", response.val / 4.0);
+
+                    start1_ms = now_ms;
+                }
             }
         }
         else {
