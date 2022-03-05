@@ -1,5 +1,7 @@
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
+//#include <thread>
 
 #include "uds.h"
 #include "transit.h"
@@ -53,13 +55,13 @@ bool Transit::initialize(const char *hs_can_interface, const char *ms_can_interf
 
 void Transit::finalize()
 {
-    end_session_uds(TM_PCM_ID);
+    //end_session_uds(modules[TM_PCM].can_id);
     end_can();
 }
 
 bool Transit::get_vin(char *result)
 {
-    #warning "CODE STUB"
+    #warning "CODE STUB - get_vin()"
 }
 
 bool Transit::get_odometer(uint32_t &result)
@@ -68,7 +70,7 @@ bool Transit::get_odometer(uint32_t &result)
     int response_size;
 
     result = 0;
-    response_size = request_uds((uint8_t *)&response, sizeof(response), TM_PCM_ID, SID_RD_DATA_ID, 1, 0xDD01);
+    response_size = request_uds((uint8_t *)&response, sizeof(response), modules[TM_PCM].can_id, SID_RD_DATA_ID, 1, 0xDD01);
     result = response.val;
 
     return initialized && (response_size >= 0);
@@ -92,25 +94,36 @@ bool Transit::control_rpm(bool enabled, uint16_t rpm_desired)
     int response_size;
 
     if (enabled) {
-        if (begin_session_uds(TM_PCM_ID, UDS_DIAG_EXTENDED)) {
-            if (request_security_uds(TM_PCM_ID)) {
-                set_tester_present(true, 1000); // TODO: Period?? Guess!
+        // TODO: Need to detect or keep track of session status, automatically begin the extended session and unlock it if necessary.
+        // ?? Keep a list of requests as they are made, and whether they're repeating or one-shot ??
 
-                response_size = request_uds(NULL, 0, TM_PCM_ID,  SID_IO_CTRL_ID, 4, 0x0308, 0x03, HBYTE16(rpm_desired), LBYTE16(rpm_desired) );
+        begin_session_uds(modules[TM_PCM].can_id, UDS_DIAG_EXTENDED);
+        //if (begin_session_uds(modules[TM_PCM].can_id, UDS_DIAG_EXTENDED)) {
+            if (request_security_uds(modules[TM_PCM].can_id)) {
+                usleep(10000); // Determined a delay is required to prevent failure on next request. Timing is guessed.
+
+                send_tester_present_uds(modules[TM_PCM].can_id);
+
+                response_size = request_uds(NULL, 0, modules[TM_PCM].can_id,  SID_IO_CTRL_ID, 4, 0x0308, 0x03, HBYTE16(rpm_desired), LBYTE16(rpm_desired) );
+
+                usleep(10000); // Determined a delay is required to prevent failure on next request. Timing is guessed.
+
+                set_tester_present(true, 500);
 
                 return initialized && (response_size >= 0);
             }
             else {
                 printf("ERROR: Security request failed\n");
             }
-        }
-        else {
-            printf("ERROR: Begin session failed\n");
-        }
+        //}
+        //else {
+        //    printf("ERROR: Begin session failed\n");
+        //}
     }
     else {
+        // TODO: As above, needs to automatically end the extended session and turn off tester_present when no longer needed.
         set_tester_present(false, 0);
-        end_session_uds(TM_PCM_ID);
+        end_session_uds(modules[TM_PCM].can_id);
     }
 
 }

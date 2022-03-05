@@ -49,9 +49,16 @@ int main(int argc, char **argv) {
         printf("ERROR: Initialization failed\n");
         exit(1);
     }
-    //printf("tr.initialize completed without error\n");
-    /*
 
+    if(tr.control_rpm(true, 1500)) {
+        usleep(10000000);
+        tr.control_rpm(false, 0);
+    }
+
+    // CLEANUP CODE AFTER THIS
+    tr.finalize();
+
+    /*
     start1_ms = timestamp();
 
     while(running) {
@@ -98,7 +105,7 @@ int main(int argc, char **argv) {
 */
 
 
-
+/*
 // OLD CODE - KEEP UNTIL OTHER IS WORKING
     //char can_interface[33];
     //strcpy(can_interface,  "can0");
@@ -145,8 +152,9 @@ int main(int argc, char **argv) {
 
     response_size = request_uds((uint8_t *)&response, sizeof(response), 0x7E0, SID_RD_DATA_ID, 1, 0xDD01);
     printf("Odometer: %d\n", response.val);
+*/
 
-
+/*
     // Raise RPM for 10 seconds
     if(begin_session_uds(0x7E0, UDS_DIAG_EXTENDED)) {
         if(request_security_uds(0x7E0)) {
@@ -189,6 +197,9 @@ int main(int argc, char **argv) {
     else {
         printf("ERROR: begin_session_uds() failed\n");
     }
+*/
 
-    end_can();
+
+//    end_can();
+
 }

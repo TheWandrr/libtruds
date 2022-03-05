@@ -20,7 +20,6 @@
 
 #include "uds.h"
 #include "truds.h"
-#include "transit.h"
 
 // TODO: Major cleanup after restructuring, remove unused
 // TODO: Refactor as object to handle connection to multiple CAN busses
@@ -92,7 +91,7 @@ void print_can_frame(struct can_frame *frame) {
 static void *tester_present(void *p) {
     while(_running) {
         if(enable_tester_present) {
-            send_tester_present_uds(TM_PCM_ID);
+            send_tester_present_uds(0x7E0); // TODO: Change to constant or variable, not immediate
             usleep(tester_present_period * 1000);
         }
         else {
@@ -431,9 +430,12 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
     bool timeout = false;
 
     if (!_running || uds_busy) {
-        // DEBUG //
-        printf("ERROR: UDS busy\n");
-        // DEBUG //
+        if (!_running) {
+            printf("ERROR: Not running\n");
+        }
+        if (uds_busy) {
+            printf("ERROR: UDS busy [Not sent: %0X   %0X]\n", can_id, sid);
+        }
         return ERR_REQ_UDS_BUSY;
     }
 
