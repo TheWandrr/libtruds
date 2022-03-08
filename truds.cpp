@@ -24,42 +24,24 @@
 // TODO: Major cleanup after restructuring, remove unused
 // TODO: Refactor as object to handle connection to multiple CAN busses
 // TODO: Consider using an iso-tp library instead of custom code
-
-//------------- OLD COMMENTS BELOW HERE -----------------------
-
-// TODO: *** Modify add_pid_request (change name) to take different formats of requests: security, tester present, session, pid, etc. ***
-
 // TODO: Add PIDS (0x22) and (0x09) from config file
-// TODO: Add PIDS from UI with popup form
-// TODO: Save PIDS to config file
-
+// TODO: Config file, consider https://github.com/hyperrealm/libconfig
 // TODO: Parse received OBDII messages https://en.wikipedia.org/wiki/OBD-II_PIDs
-
 // TODO: Try building and installing hardware filter MCP2515 driver for RPi - https://github.com/TheWandrr/mcp251x
 
-// TODO: Figure out what you want on screen and the layout (start simple with a few live PIDs
-// TODO: Config file, consider https://github.com/hyperrealm/libconfig
-// TODO: Think about interface requirements for toggling on/off values and entering PID control data
-
-//node_t *head_pid_request = NULL;
-//node_t *head_pid_response = NULL;
-//node_t *head_display_field = NULL;
-
-//pthread_mutex_t lock_pid_request_list_access;
-
-bool _running;
+bool _running = false;
 
 static int cansocket;
-static bool uds_busy;
+static bool uds_busy = false;
+static bool in_session = false;
 static uds_response_t uds_response;
 static uint16_t request_timeout_ms;
-static bool enable_tester_present;
+static bool enable_tester_present = false;
 static uint16_t tester_present_period;
+static uint64_t request_start_ms; // UDS timeout
 
 static pthread_t rx_can_thread;
 static pthread_t tester_present_thread;
-
-#warning Need to send periodic tester-present messages when in session?
 
 // Returns milliseconds past the epoch
 uint64_t timestamp(void) {
@@ -220,7 +202,6 @@ static void *rx_can(void *p) {
                     //}
                     //printf("\n");
                     // DEBUG
-
                 }
 
                 // First frame of multi-frame response
@@ -258,20 +239,35 @@ static void *rx_can(void *p) {
                 }
 
                 // Common to case 0 and 1
-                uds_response.frame_index = 0; // May not be required if this is correctly initialized
+                uds_response.frame_index = 0;
+                prev_frame_index = 0;
 
                 // First frame of multi-frame response
                 if ( HNYBBLE8(frame.data[0]) == 1 ) {
                     // Send flow control response directing ECU to send all remaining frames without delay
 
+                    request_start_ms = timestamp(); // Reset uds timeout for next frame
+
+                    // DEBUG
+                    //printf("[%llu] Sending flow control to begin multi-frame transfer...\n", request_start_ms);
+                    // DEBUG
+
                     // TODO: Replace with call to request_uds(), re-entrant??
                     // TODO: Either reset the timeout on receipt of each consecutive frame, or require that the timeout be set longer for multi-frame responses that take some time, if it's even a problem with the default timeout for single frame responses
                     struct can_frame frame;
-                    frame.can_id = uds_response.can_id - 8;
+                    frame.can_id = uds_response.can_id;
                     frame.can_dlc = 8;
                     frame.data[0] = 0x30;
                     memset(frame.data+1, 0, 7);
+
+                    // DEBUG
+                    //printf("Flow control frame to be sent --> ");
+                    //print_can_frame(&frame);
+                    // DEBUG
+
                     write(cansocket, &frame, sizeof(struct can_frame));
+
+                    //printf("Returned from writing flow control frame\n");
                 }
 
                 //return NULL;
@@ -279,13 +275,31 @@ static void *rx_can(void *p) {
                 break;
 
             case 2: // Consecutive frame of multi-frame response
+                uds_response.frame_index = LNYBBLE8(frame.data[0]);
 
                 // DEBUG //
                 //printf("ISO-TP-2 consecutive frame\n"); fflush(NULL);
                 // DEBUG //
 
-                if ( (uds_response.can_id == frame.can_id) &&
-                        (uds_response.frame_index == prev_frame_index ) &&
+                // DEBUG
+                //printf("uds_response.can_id = %0X\n", uds_response.can_id);
+                //printf("frame.can_id = %0X\n", frame.can_id);
+                //printf("uds_response.frame_index = %d\n", uds_response.frame_index);
+                //printf("prev_frame_index = %d\n", prev_frame_index);
+                //printf("uds_response.data_received = %d\n", uds_response.data_received);
+                //printf("uds_response.data_size = %d\n", uds_response.data_size);
+                // DEBUG
+
+                // DEBUG
+                //printf("DATA RECEIVED --> [");
+                //for (int i = 0; i < uds_response.data_received; i++) {
+                //    printf("%02X ", uds_response.data[i]);
+                //}
+                //printf("]\n");
+                // DEBUG
+
+                if ( (uds_response.can_id == (frame.can_id - 8)) &&
+                        (uds_response.frame_index == (prev_frame_index + 1) ) &&
                         (uds_response.data_received < uds_response.data_size) )
                 {
 
@@ -304,7 +318,11 @@ static void *rx_can(void *p) {
                         uds_response.data_received += data_bytes_left;
                     }
 
-                    uds_response.frame_index = LNYBBLE8(frame.data[0]);
+                    // DEBUG
+                    //printf("Data bytes remaining: %d\n", data_bytes_left);
+                    // DEBUG
+
+                    prev_frame_index = uds_response.frame_index;
 
                     break;
                 }
@@ -327,6 +345,14 @@ static void *rx_can(void *p) {
                 // DEBUG //
                 //printf("ISO-TP: Received all expected data\n");
                 // DEBUG //
+
+                // DEBUG
+                //printf("DATA RECEIVED --> [");
+                //for (int i = 0; i < uds_response.data_received; i++) {
+                //    printf("%02X ", uds_response.data[i]);
+                //}
+                //printf("]\n");
+                // DEBUG
 
                 uds_busy = false;
             }
@@ -364,8 +390,8 @@ bool begin_session_uds(canid_t can_id, uint8_t type) {
     if ((response_size == 4) &&
             (response.byte[0] != UDS_ERR_SNSIAS)) {
 
-#warning "CODE STUB - If the request succeeded, set a flag indicating we're in a session. Don't try to start a new session."
-        // TODO: Also, account for multiple PIDs being controlled.
+        in_session = true;
+        // TODO: account for multiple PIDs being controlled?
 
         send_tester_present_uds(can_id); // Not sure if this is actually required
         return true;
@@ -385,18 +411,14 @@ bool end_session_uds(canid_t can_id) {
     if ((response_size == 4) &&
             (response.byte[0] != UDS_ERR_SNSIAS)) {
 
-#warning "CODE STUB - Clear flag that indicates we're in a session"
-        // TODO: Also, account for multiple PIDs being controlled.
+        in_session = false;
+        // TODO: Also, account for multiple PIDs being controlled?
 
         return true;
     }
     else {
         return false;
     }
-}
-
-bool is_busy_uds(void) {
-    return uds_busy;
 }
 
 void set_request_timeout_uds(uint16_t new_request_timeout_ms) {
@@ -426,7 +448,6 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
     bool expect_response = true;
     int response_size;
     int vardata[8] = {0,0,0,0,0,0,0,0};
-    uint64_t request_start_ms;
     bool timeout = false;
 
     if (!_running || uds_busy) {
@@ -524,6 +545,10 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
         return ERR_REQ_UDS_CAN_WR;
     }
 
+    // DEBUG
+    //printf("[%llu] Starting clock for UDS request timeout...\n", request_start_ms);
+    // DEBUG
+
     // Non-blocking wait for rx_can thread to receive response, or timeout
     uint64_t elapsed_ms;
     while( (_running) &&
@@ -536,7 +561,7 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
 
     if (timeout) {
         // DEBUG //
-        printf("ERROR: UDS request timeout [elapsed = %lld, request_timeout_ms = %d]\n", elapsed_ms, request_timeout_ms);
+        printf("ERROR: UDS request timeout [elapsed = %llu, request_timeout_ms = %d]\n", elapsed_ms, request_timeout_ms);
         // DEBUG //
         uds_busy = false; // TODO: We need to do this to try again, but how do we know it isn't busy?
         return ERR_REQ_UDS_TIMEOUT;
@@ -547,9 +572,15 @@ int request_uds(uint8_t *buff, size_t buff_max, canid_t can_id, uint8_t sid, siz
         response_size = min(buff_max, uds_response.data_size);
         memset(buff, 0, buff_max);
         // TODO: Investigate whether there's a better way to swap the byte order here
-        //memcpy(buff, uds_response.data, response_size);
-        for (int i = 0; i < response_size; i++) {
-            buff[i] = uds_response.data[response_size - i - 1];
+
+        // This might not be well thought-out. single-frame responses needed reversed byte order but strings didn't, hence this test...
+        if (response_size <= 4) {
+            for (int i = 0; i < response_size; i++) {
+                buff[i] = uds_response.data[response_size - i - 1];
+            }
+        }
+        else {
+            memcpy(buff, uds_response.data, response_size);
         }
 
         // DEBUG
@@ -579,6 +610,7 @@ int begin_can(char *can_iface_name) {
 
     _running = false;
     uds_busy = false;
+    in_session = false;
     cansocket = -1;
 
     set_request_timeout_uds(250);
@@ -950,10 +982,11 @@ bool request_security_uds(canid_t can_id) {
     byte32_t key;
     byte32_t seed;
 
-    // TODO: Check if session already started before requesting this
-//    if(!begin_session_uds(can_id, UDS_DIAG_EXTENDED)) {
-//        return false;
-//    }
+    if (!in_session) {
+        if(!begin_session_uds(can_id, UDS_DIAG_EXTENDED)) {
+            return false;
+        }
+    }
 
     result = request_uds((uint8_t *)&response, sizeof(response), can_id, SID_SEC_ACCESS, 1, 3);
 

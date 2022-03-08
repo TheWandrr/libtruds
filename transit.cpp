@@ -47,7 +47,7 @@ bool Transit::initialize(const char *hs_can_interface, const char *ms_can_interf
     //    init_can(ms_can);
     //}
 
-    set_request_timeout_uds(750);
+    set_request_timeout_uds(250);
 
     initialized = true;
     return true;
@@ -55,13 +55,26 @@ bool Transit::initialize(const char *hs_can_interface, const char *ms_can_interf
 
 void Transit::finalize()
 {
+    // TODO: Need to track each session and only end a session when still open
     //end_session_uds(modules[TM_PCM].can_id);
     end_can();
 }
 
 bool Transit::get_vin(char *result)
 {
-    #warning "CODE STUB - get_vin()"
+    const size_t VIN_LENGTH = 17;
+    int response_size;
+
+    response_size = request_uds((uint8_t *)result, VIN_LENGTH, modules[TM_PCM].can_id, SID_RD_DATA_ID, 1, 0xF190);
+
+    if (initialized && (response_size = VIN_LENGTH)) {
+        result[VIN_LENGTH] = '\0';
+        return true;
+    }
+    else {
+        strcpy(result, "");
+        return false;
+    }
 }
 
 bool Transit::get_odometer(uint32_t &result)
@@ -69,11 +82,16 @@ bool Transit::get_odometer(uint32_t &result)
     byte32_t response;
     int response_size;
 
-    result = 0;
     response_size = request_uds((uint8_t *)&response, sizeof(response), modules[TM_PCM].can_id, SID_RD_DATA_ID, 1, 0xDD01);
-    result = response.val;
 
-    return initialized && (response_size >= 0);
+    if (initialized && (response_size > 0)) {
+        result = response.val;
+        return true;
+    }
+    else {
+        result = 0;
+        return false;
+    }
 }
 
 bool Transit::get_rpm(uint32_t &result)
@@ -81,11 +99,16 @@ bool Transit::get_rpm(uint32_t &result)
     byte32_t response;
     int response_size;
 
-    result = 0;
     response_size = request_uds((uint8_t *)&response, sizeof(response), BROADCAST_CAN_ID, SID_SHOW_CURR_DATA, 1, 0x0C);
-    result = response.val;
 
-    return initialized && (response_size >= 0);
+    if (initialized && (response_size > 0)) {
+        result = response.val;
+        return true;
+    }
+    else {
+        result = 0;
+        return false;
+    }
 }
 
 bool Transit::control_rpm(bool enabled, uint16_t rpm_desired)
@@ -114,16 +137,18 @@ bool Transit::control_rpm(bool enabled, uint16_t rpm_desired)
             }
             else {
                 printf("ERROR: Security request failed\n");
+                return false;
             }
         //}
         //else {
         //    printf("ERROR: Begin session failed\n");
+        //    return false;
         //}
     }
     else {
         // TODO: As above, needs to automatically end the extended session and turn off tester_present when no longer needed.
         set_tester_present(false, 0);
         end_session_uds(modules[TM_PCM].can_id);
+        return true;
     }
-
 }

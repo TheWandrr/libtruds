@@ -15,13 +15,10 @@ void sig_handler(int sig) {
 }
 
 int main(int argc, char **argv) {
-    char hs_can_interface[33];
-    char ms_can_interface[33];
-    byte32_t response;
-    size_t response_size;
-    uint64_t start1_ms, start2_ms;
-    uint64_t now_ms;
-    bool high_idle = false;
+    char hs_can_interface[33] = "";
+    char ms_can_interface[33] = "";
+    uint32_t response;
+    char vin[18] = "";
     Transit tr;
 
     signal(SIGINT, sig_handler);
@@ -34,11 +31,9 @@ int main(int argc, char **argv) {
         printf("USAGE: %s <HS-CAN-INTERFACE> <MS-CAN-INTERFACE>\n", argv[0]);
         printf("Using default 'HS-CAN <--> can0'.  Specify a different interface as an argument if desired.\n");
         strcpy(hs_can_interface, "can0");
-        strcpy(ms_can_interface, "");
     }
     else if (argc == 2) {
         strncpy(hs_can_interface, argv[1], sizeof(hs_can_interface)-1);
-        strcpy(ms_can_interface, "");
     }
     else if (argc == 3) {
         strncpy(hs_can_interface, argv[1], sizeof(hs_can_interface)-1);
@@ -50,60 +45,30 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    if(tr.get_vin(vin)) {
+        printf("VIN: %s\n", vin);
+    }
+    else {
+        printf("ERROR: Could not retrieve VIN\n");
+    }
+/*
+    if(tr.get_odometer(response)) {
+        printf("Odometer: %d\n", response);
+    }
+    else {
+        printf("ERROR: Could not retrieve odometer\n");
+    }
+
     if(tr.control_rpm(true, 1500)) {
-        usleep(10000000);
+        sleep(15);
         tr.control_rpm(false, 0);
     }
-
+    else {
+        printf("ERROR: Could not control RPM\n");
+    }
+*/
     // CLEANUP CODE AFTER THIS
     tr.finalize();
-
-    /*
-    start1_ms = timestamp();
-
-    while(running) {
-
-
-        // This block is executed every 1000ms
-        if( ( (now_ms = timestamp()) - start1_ms ) >= 1000) {
-            //printf("[%lld] test.c main loop running\n", now_ms);
-
-            uint32_t rpm;
-            if (tr.get_rpm(rpm)) {
-                printf("RPM: %d\n", rpm);
-            }
-            else {
-                printf("ERROR: RPM not available\n");
-            }
-
-            start1_ms = now_ms;
-        }
-
-        // This block is executed every 10000ms
-        if( ( (now_ms = timestamp()) - start2_ms ) >= 10000) {
-            printf("[%lld] %s high idle\n", now_ms, high_idle ? "clearing" : "setting");
-
-            uint16_t rpm_desired = 1250;
-
-            if(!high_idle) {
-                if (!tr.control_rpm(true, rpm_desired)) {
-                    printf("ERROR: Could not control RPM to %d\n", rpm_desired);
-                }
-            }
-            else {
-                if (!tr.control_rpm(false, 0)) {
-                    printf("ERROR: Could not stop RPM control\n");
-                }
-            }
-
-            high_idle = !high_idle;
-            start2_ms = now_ms;
-        }
-    }
-
-    tr.finalize();
-*/
-
 
 /*
 // OLD CODE - KEEP UNTIL OTHER IS WORKING
@@ -153,53 +118,5 @@ int main(int argc, char **argv) {
     response_size = request_uds((uint8_t *)&response, sizeof(response), 0x7E0, SID_RD_DATA_ID, 1, 0xDD01);
     printf("Odometer: %d\n", response.val);
 */
-
-/*
-    // Raise RPM for 10 seconds
-    if(begin_session_uds(0x7E0, UDS_DIAG_EXTENDED)) {
-        if(request_security_uds(0x7E0)) {
-
-            uint64_t start_ms;
-            const uint32_t runtime_ms = 10000;
-
-            // NOTE: Timing and presence of tester_present seems to be picky. Haven't found a standard yet.
-            // May also work if reading a pid frequently, but also sending less frequent tester_present (4 second interval??)
-            send_tester_present_uds(0x7E0);
-            usleep(10000); // This might be needed to prevent requests too quickly
-            request_uds(NULL, 0, 0x7E0, SID_IO_CTRL_ID, 4,
-                        0x0308, 0x03, 0x04, 0xD2);
-
-            while ((timestamp() - start_ms) < 1) {};
-            send_tester_present_uds(0x7E0);
-
-            start_ms = timestamp();
-            start1_ms = timestamp();
-
-            while ((timestamp() - start_ms) < runtime_ms) {
-                send_tester_present_uds(0x7E0);
-                usleep(100);
-
-                // Fetch and display actual RPM
-                if( ( (now_ms = timestamp()) - start1_ms ) >= 1000) {
-                    response_size = request_uds((uint8_t *)&response, sizeof(response.val), 0x7E0, SID_RD_DATA_ID, 1, 0xF40C);
-                    printf("RPM: %0.1f\n", response.val / 4.0);
-
-                    start1_ms = now_ms;
-                }
-            }
-        }
-        else {
-            printf("ERROR: request_security_uds() failed\n");
-        }
-
-        end_session_uds(0x7E0);
-    }
-    else {
-        printf("ERROR: begin_session_uds() failed\n");
-    }
-*/
-
-
-//    end_can();
 
 }

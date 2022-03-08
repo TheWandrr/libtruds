@@ -5,33 +5,53 @@
 //#include <thread>
 
 #include "uds.h"
-#include "truds.h"
+//#include "truds.h"
 
 using namespace std;
 
-/*
-enum TransitPIDs {
-    PID_PCM_ODOM,
-};
-
-struct PIDs {
-    TransitPIDs tp_enum;
-    TransitBus bus;
-    uint8_t service_mode; // OBD_SID or UDS_SID
-    uint16_t pid;
-    int refresh_ms;
-    const char *short_name;
-    const char *long_name;
-    const char *unit;
-};
-
-static const PIDs pids[] = {
-    { PID_PCM_ODOM,         HS_CAN, 0x22, 0xDD01, 1000,     "PCM.ODO",        "Odometer",                         "km" },
-};
-*/
-
 class Transit
 {
+
+public:
+
+    // Must synchronize: TransitModuleIdx, TransitModuleId, modules[]
+    enum TransitModuleIdx {
+        TM_APIM,
+        TM_ABS,
+        TM_ACM,
+        TM_BCM,
+        TM_FCIM,
+        TM_FCDIM,
+        TM_GPSM,
+        TM_IPC,
+        TM_IPMA,
+        TM_PAM,
+        TM_PCM,
+        TM_RCM,
+        TM_RBM,
+        TM_SASM,
+        TM_TBM,
+        TM_TRM,
+        TM_TCM,
+    };
+
+    Transit();
+    ~Transit();
+
+    bool initialize(const char *hs_can_interface, const char *ms_can_interface);
+    void finalize();
+
+    // TODO: Getters/setters should return more detailed status codes
+    bool get_vin(char *result);
+    bool get_odometer(uint32_t &result);
+    bool get_rpm(uint32_t &result);
+    bool get_coolant_temp(uint8_t &result);
+    bool get_fuel_level(uint8_t &result);
+    bool get_vehicle_speed(double &result);
+    bool get_in_park(bool &result);
+
+    bool control_rpm(bool enabled, uint16_t desired_rpm);
+    bool control_rpm(bool enabled);
 
 private:
 
@@ -71,42 +91,6 @@ private:
     char ms_can[32];
     char hs_can[32];
 
-public:
-
-    // Must synchronize: TransitModuleIdx, TransitModuleId, modules[]
-    enum TransitModuleIdx {
-        TM_APIM,
-        TM_ABS,
-        TM_ACM,
-        TM_BCM,
-        TM_FCIM,
-        TM_FCDIM,
-        TM_GPSM,
-        TM_IPC,
-        TM_IPMA,
-        TM_PAM,
-        TM_PCM,
-        TM_RCM,
-        TM_RBM,
-        TM_SASM,
-        TM_TBM,
-        TM_TRM,
-        TM_TCM,
-    };
-
-    Transit();
-    ~Transit();
-
-    bool initialize(const char *hs_can_interface, const char *ms_can_interface);
-    void finalize();
-
-    // TODO: Getters/setters should return more detailed status codes
-    bool get_vin(char *result);
-    bool get_odometer(uint32_t &result);
-    bool get_rpm(uint32_t &result);
-
-    bool control_rpm(bool enabled, uint16_t desired_rpm);
-    bool control_rpm(bool enabled);
 };
 
 #endif
