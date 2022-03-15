@@ -104,7 +104,11 @@ static void *rx_can(void *p) {
     while(_running) {
         // DEBUG - Print a status message every (period_ms) milliseconds
         if ((timestamp() - start_ms) >= period_ms) {
+
+            // DEBUG
             //printf("[%lld] rx_can thread is active\n", timestamp());
+            // DEBUG
+
             start_ms = timestamp();
         }
         // DEBUG
@@ -359,9 +363,9 @@ static void *rx_can(void *p) {
 /////////////////////////////////////////////////////////////////////////////////
 
         }
-        else {
-            usleep(10000); // Yield for at least 10 ms - improves CPU usage?
-        }
+        //else {
+        //    usleep(10000); // Yield for at least 10 ms - improves CPU usage?
+        //}
     }
 }
 

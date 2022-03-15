@@ -18,7 +18,8 @@ int main(int argc, char **argv) {
     char hs_can_interface[33] = "";
     char ms_can_interface[33] = "";
     uint32_t response;
-    char vin[18] = "";
+    uint8_t uds_buff[4096];
+
     Transit tr;
 
     signal(SIGINT, sig_handler);
@@ -45,12 +46,32 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    if(tr.get_vin(vin)) {
-        printf("VIN: %s\n", vin);
+    // NEW GENERIC get_pid() FUNCTION
+    if(tr.get_pid(tr.TP_PCM_VIN, uds_buff)) {
+        printf("VIN: %s\n", uds_buff);
     }
     else {
         printf("ERROR: Could not retrieve VIN\n");
     }
+
+    if(tr.get_pid(tr.TP_PCM_RPM, uds_buff)) {
+        printf("RPM: %d\n", uint32_t(uds_buff));
+    }
+    else {
+        printf("ERROR: Could not retrieve RPM\n");
+    }
+
+
+/*
+    if( tr.get_vin( (char *)(uds_buff) ) ) {
+        printf("VIN: %s\n", uds_buff);
+    }
+    else {
+        printf("ERROR: Could not retrieve VIN\n");
+    }
+*/
+
+
 /*
     if(tr.get_odometer(response)) {
         printf("Odometer: %d\n", response);
@@ -58,7 +79,18 @@ int main(int argc, char **argv) {
     else {
         printf("ERROR: Could not retrieve odometer\n");
     }
+*/
 
+
+    if(tr.get_rpm(response)) {
+        printf("RPM: %d\n", response);
+    }
+    else {
+        printf("ERROR: Could not retrieve RPM\n");
+    }
+
+
+/*
     if(tr.control_rpm(true, 1500)) {
         sleep(15);
         tr.control_rpm(false, 0);

@@ -14,7 +14,26 @@ class Transit
 
 public:
 
-    // Must synchronize: TransitModuleIdx, TransitModuleId, modules[]
+    enum TransitPidType {
+        TPT_BOOL,
+        TPT_UINT8,
+        TPT_UINT16,
+        TPT_UINT24,
+        TPT_UINT32,
+        TPT_INT8,
+        TPT_INT16,
+        TPT_INT24,
+        TPT_INT32,
+        TPT_STRING,
+    };
+
+    enum ModuleAccessType {
+        MAT_OBDII,
+        MAT_UDS_DEFAULT,
+        MAT_UDS_EXTENDED,
+    };
+
+    // Must synchronize: TransitModuleIdx, transit_module[]
     enum TransitModuleIdx {
         TM_APIM,
         TM_ABS,
@@ -35,6 +54,13 @@ public:
         TM_TCM,
     };
 
+    // Must synchromize: TransitPidIdx, transit_pid[]
+    enum TransitPidIdx {
+        TP_PCM_VIN,             // Vehicle information number
+        TP_PCM_ODO,             // Odometer
+        TP_PCM_RPM,             // Engine Speed
+    };
+
     Transit();
     ~Transit();
 
@@ -42,6 +68,8 @@ public:
     void finalize();
 
     // TODO: Getters/setters should return more detailed status codes
+    bool get_pid(uint16_t pid, uint8_t *buff);
+
     bool get_vin(char *result);
     bool get_odometer(uint32_t &result);
     bool get_rpm(uint32_t &result);
@@ -66,8 +94,16 @@ private:
         const char *long_name[256];
     };
 
-    // Must synchronize: TransitModuleIdx, TransitModuleId, modules[]
-    static constexpr TransitModule modules[17] = {
+    struct TransitPid {
+        uint16_t                addr;
+        size_t                  data_size;
+        TransitModule           server;
+        TransitPidType          data_type;
+        ModuleAccessType        access_type;
+    };
+
+    // Must synchronize: TransitModuleIdx, transit_module[]
+    TransitModule transit_module[17] = {
         {0x7D0, "APIM",     "Accessory Protocol Interface Module (SYNC)"},
         {0x760, "ABS",      "Anti-lock Braking System Module"},
         {0x727, "ACM",      "Audio Control Module"},
@@ -85,6 +121,13 @@ private:
         {0x757, "TBM",      "Trailer Brake Control Module"},
         {0x791, "TRM",      "Trailer Module"},
         {0x7E1, "TCM",      "Transmission Control Module"},
+    };
+
+    // TODO: These will need conversion expressions too!
+    TransitPid transit_pid[3] = {
+        {0xF190, 17,  transit_module[TM_PCM], TPT_STRING, MAT_UDS_DEFAULT}, // TP_PCM_VIN
+        {0xDD01, 3,   transit_module[TM_PCM], TPT_UINT24, MAT_UDS_DEFAULT}, // TP_PCM_ODO
+        {0xF40C, 2,   transit_module[TM_PCM], TPT_UINT16, MAT_UDS_DEFAULT}, // TP_PCM_RPM
     };
 
     bool initialized;

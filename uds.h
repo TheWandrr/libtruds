@@ -3,7 +3,9 @@
 
 #define BROADCAST_CAN_ID 0x7DF
 
-enum OBD_SID {
+enum UDS_SID {
+
+// OBDII services
     SID_SHOW_CURR_DATA =        0x01,
     SID_SHOW_FF_DATA =          0x02,
     SID_SHOW_DTCS =             0x03,
@@ -14,10 +16,8 @@ enum OBD_SID {
     SID_CTRL_ONBOARD_SYS =      0x08,
     SID_RQ_VEH_INFO =           0x09,
     SID_PERM_DTCS =             0x0A,
-};
 
-// Non-OBD services begin at 0x10
-enum UDS_SID {
+// UDS services
     SID_DIAG_SESS_CTRL =        0x10,
     SID_ECU_RESET =             0x11,
     SID_SEC_ACCESS =            0x27,
