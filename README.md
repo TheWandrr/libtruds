@@ -17,6 +17,6 @@ Communication uses linux SocketCAN, so anything that can be added to the system 
 
 # Purpose and Scope
 
-Due to variations in the way vehicle manufacturers have implemented the standard, plus the excrusiating lack of published information in this area, the focus of this project has been on a specific vehicle make and model. Many of the concepts are applicable to other vehicles but some reorganization would be required to make this happen in the future. Testing has been limited to a North American 2018 model year 3.8L gasoline Ford Transit 250. It is with the hope that many other combinations can be validated that this project is being made available to the public.
+Due to variations in the way vehicle manufacturers have implemented the standard, plus the excrusiating lack of published information in this area, the focus of this project has been on a specific vehicle make and model. Many of the concepts are applicable to other vehicles but some reorganization would be required to make this happen in the future. Testing has been limited to a North American 2018 model year 3.7L gasoline Ford Transit 250. It is with the hope that many other combinations can be validated that this project is being made available to the public.
 
 This is a library, so only minimal test code is included. No user interface currently exists, but if this code reaches a stage of maturity then such a creation would be of benefit to the community.
